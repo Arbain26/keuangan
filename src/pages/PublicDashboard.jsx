@@ -4,6 +4,7 @@ import { calculateStats } from '../utils/calculations';
 import { formatCurrency } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle, Quote, PieChart, PiggyBank, Lightbulb } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -116,6 +117,22 @@ const PublicDashboard = () => {
     const weeklyHealth = getFinancialHealth(stats.weeklyIncome, stats.weeklyExpense);
     const monthlyHealth = getFinancialHealth(stats.monthlyIncome, stats.monthlyExpense);
 
+    // Animation Variants
+    const fadeInUp = {
+        hidden: { opacity: 0, y: 60 },
+        visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+    };
+
+    const staggerContainer = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.2
+            }
+        }
+    };
+
     return (
         <div className="min-h-screen bg-white text-gray-900 font-sans">
             {/* Navbar */}
@@ -123,9 +140,13 @@ const PublicDashboard = () => {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16 items-center">
                         <div className="flex items-center gap-2">
-                            <div className="bg-blue-600 p-1.5 rounded-lg">
+                            <motion.div
+                                initial={{ rotate: -180, opacity: 0 }}
+                                animate={{ rotate: 0, opacity: 1 }}
+                                transition={{ duration: 0.8 }}
+                                className="bg-blue-600 p-1.5 rounded-lg">
                                 <TrendingUp className="w-5 h-5 text-white" />
-                            </div>
+                            </motion.div>
                             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
                                 FinTrack
                             </h1>
@@ -149,31 +170,46 @@ const PublicDashboard = () => {
             {/* Hero Section */}
             <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-blue-50/50 to-white">
                 <div className="max-w-4xl mx-auto text-center">
-                    <span className="inline-block py-1 px-3 rounded-full bg-blue-100 text-blue-700 text-xs font-bold tracking-wide uppercase mb-6">
-                        Transparansi Keuangan
-                    </span>
-                    <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-6 leading-tight">
-                        Kelola Keuangan dengan <br />
-                        <span className="text-blue-600">Lebih Cerdas & Terbuka.</span>
-                    </h2>
-                    <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-                        Platform manajemen keuangan pribadi yang didesain untuk mencatat pemasukan
-                        dan pengeluaran secara terstruktur, transparan, dan mudah dipahami melalui visualisasi data.
-                    </p>
-                    <div className="flex justify-center gap-4">
-                        <button
-                            onClick={scrollToStats}
-                            className="group bg-blue-600 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-blue-700 transition flex items-center gap-2 shadow-xl shadow-blue-200"
-                        >
-                            Lihat Statistik
-                            <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
-                        </button>
-                    </div>
+                    <motion.div
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true }}
+                        variants={fadeInUp}
+                    >
+                        <span className="inline-block py-1 px-3 rounded-full bg-blue-100 text-blue-700 text-xs font-bold tracking-wide uppercase mb-6">
+                            Transparansi Keuangan
+                        </span>
+                        <h2 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-6 leading-tight">
+                            Kelola Keuangan dengan <br />
+                            <span className="text-blue-600">Lebih Cerdas & Terbuka.</span>
+                        </h2>
+                        <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+                            Platform manajemen keuangan pribadi yang didesain untuk mencatat pemasukan
+                            dan pengeluaran secara terstruktur, transparan, dan mudah dipahami melalui visualisasi data.
+                        </p>
+                        <div className="flex justify-center gap-4">
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={scrollToStats}
+                                className="group bg-blue-600 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-blue-700 transition flex items-center gap-2 shadow-xl shadow-blue-200"
+                            >
+                                Lihat Statistik
+                                <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
+                            </motion.button>
+                        </div>
+                    </motion.div>
                 </div>
             </section>
 
             {/* Quote Section */}
-            <section className="bg-[#1e293b] text-white py-12 px-4 relative overflow-hidden">
+            <motion.section
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeInUp}
+                className="bg-[#1e293b] text-white py-12 px-4 relative overflow-hidden"
+            >
                 <div className="absolute top-0 left-0 w-32 h-32 bg-lime-400 rounded-full blur-[80px] opacity-20"></div>
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
                 <div className="max-w-4xl mx-auto text-center relative z-10">
@@ -183,50 +219,62 @@ const PublicDashboard = () => {
                     </blockquote>
                     <cite className="text-lime-400 font-bold tracking-wide uppercase text-sm">— Warren Buffett</cite>
                 </div>
-            </section>
+            </motion.section>
 
             {/* About / Features Section */}
             <section className="py-20 px-4 border-t border-gray-100">
-                <div className="max-w-7xl mx-auto">
+                <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={staggerContainer}
+                    className="max-w-7xl mx-auto"
+                >
                     <div className="grid md:grid-cols-3 gap-12">
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
+                        <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
                             <div className="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mx-auto mb-4">
                                 <ShieldCheck className="w-6 h-6" />
                             </div>
                             <h3 className="text-xl font-bold mb-2">Data Terjamin</h3>
                             <p className="text-gray-500 leading-relaxed">Seluruh data transaksi dicatat dengan aman dan hanya admin yang dapat mengubahnya.</p>
-                        </div>
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
+                        </motion.div>
+                        <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
                             <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
                                 <BarChart3 className="w-6 h-6" />
                             </div>
                             <h3 className="text-xl font-bold mb-2">Visualisasi Interaktif</h3>
                             <p className="text-gray-500 leading-relaxed">Grafik dinamis memudahkan Anda melihat tren keuangan mingguan hingga tahunan.</p>
-                        </div>
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
+                        </motion.div>
+                        <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
                             <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4">
                                 <TrendingUp className="w-6 h-6" />
                             </div>
                             <h3 className="text-xl font-bold mb-2">Pantau Progress</h3>
                             <p className="text-gray-500 leading-relaxed">Monitoring cashflow secara real-time untuk keputusan finansial yang lebih baik.</p>
-                        </div>
+                        </motion.div>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
 
             {/* Financial Education Section */}
             <section className="py-20 px-4 bg-white border-t border-gray-100">
-                <div className="max-w-7xl mx-auto">
+                <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    variants={staggerContainer}
+                    className="max-w-7xl mx-auto"
+                >
                     <div className="text-center mb-16">
-                        <span className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">Edukasi</span>
-                        <h2 className="text-3xl font-bold text-gray-900 mt-3 mb-4">Tips Keuangan Cerdas</h2>
-                        <p className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</p>
+                        <motion.span variants={fadeInUp} className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">Edukasi</motion.span>
+                        <motion.h2 variants={fadeInUp} className="text-3xl font-bold text-gray-900 mt-3 mb-4">Tips Keuangan Cerdas</motion.h2>
+                        <motion.p variants={fadeInUp} className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</motion.p>
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8">
                         {/* Tip 1 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                        <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
                             <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                                 <PieChart className="w-7 h-7 text-indigo-600" />
                             </div>
@@ -234,10 +282,10 @@ const PublicDashboard = () => {
                             <p className="text-gray-500 text-sm leading-relaxed">
                                 Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan (Needs), <span className="font-bold text-gray-700">30%</span> untuk Keinginan (Wants), dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
                             </p>
-                        </div>
+                        </motion.div>
 
                         {/* Tip 2 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                        <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
                             <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                                 <PiggyBank className="w-7 h-7 text-emerald-600" />
                             </div>
@@ -245,10 +293,10 @@ const PublicDashboard = () => {
                             <p className="text-gray-500 text-sm leading-relaxed">
                                 Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin. Ini adalah jaring pengaman Anda saat terjadi hal tak terduga seperti sakit atau PHK.
                             </p>
-                        </div>
+                        </motion.div>
 
                         {/* Tip 3 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                        <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
                             <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                                 <Lightbulb className="w-7 h-7 text-amber-500" />
                             </div>
@@ -256,14 +304,20 @@ const PublicDashboard = () => {
                             <p className="text-gray-500 text-sm leading-relaxed">
                                 Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">skill dan pengetahuan</span> Anda untuk meningkatkan potensi penghasilan di masa depan.
                             </p>
-                        </div>
+                        </motion.div>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
             {/* Stats Section */}
             <section id="stats-section" className="py-24 px-4 bg-gray-50">
-                <div className="max-w-7xl mx-auto">
+                <motion.div
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                    variants={fadeInUp}
+                    className="max-w-7xl mx-auto"
+                >
                     <div className="text-center mb-16">
                         <h2 className="text-3xl font-bold text-gray-900 mb-4">Ringkasan Keuangan</h2>
                         <p className="text-gray-500">Data berikut diambil secara real-time dari database.</p>
@@ -427,7 +481,7 @@ const PublicDashboard = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
             </section>
             <footer className="bg-white border-t py-12 text-center text-gray-400 text-sm">
                 <p>&copy; {new Date().getFullYear()} FinTrack. Dibuat untuk manajemen keuangan yang lebih baik.</p>
