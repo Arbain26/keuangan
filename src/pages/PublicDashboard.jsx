@@ -3,7 +3,7 @@ import { fetchTransactions } from '../lib/api';
 import { calculateStats } from '../utils/calculations';
 import { formatCurrency } from '../utils/format';
 import { Link } from 'react-router-dom';
-import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown } from 'lucide-react';
+import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle } from 'lucide-react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -104,6 +104,18 @@ const PublicDashboard = () => {
         document.getElementById('stats-section').scrollIntoView({ behavior: 'smooth' });
     };
 
+    // Helper to determine financial health
+    const getFinancialHealth = (income, expense) => {
+        if (income === 0) return { status: 'neutral', message: '' };
+        const ratio = expense / income;
+        if (ratio > 1) return { status: 'critical', message: 'Pengeluaran melebihi pemasukan! (Defisit)' };
+        if (ratio > 0.8) return { status: 'warning', message: 'Pengeluaran hampir mendekati pemasukan (Boros)' };
+        return { status: 'healthy', message: 'Keuangan sehat' };
+    };
+
+    const weeklyHealth = getFinancialHealth(stats.weeklyIncome, stats.weeklyExpense);
+    const monthlyHealth = getFinancialHealth(stats.monthlyIncome, stats.monthlyExpense);
+
     return (
         <div className="min-h-screen bg-white text-gray-900 font-sans">
             {/* Navbar */}
@@ -198,6 +210,26 @@ const PublicDashboard = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+
+                        {/* WARNING BANNERS */}
+                        {(weeklyHealth.status !== 'healthy' && weeklyHealth.status !== 'neutral') && (
+                            <div className={`md:col-span-3 p-4 rounded-xl flex items-center gap-3 ${weeklyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
+                                <AlertTriangle className="w-6 h-6 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Peringatan Keuangan Mingguan:</p>
+                                    <p className="text-sm">{weeklyHealth.message}</p>
+                                </div>
+                            </div>
+                        )}
+                        {(monthlyHealth.status !== 'healthy' && monthlyHealth.status !== 'neutral') && (
+                            <div className={`md:col-span-3 p-4 rounded-xl flex items-center gap-3 ${monthlyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
+                                <AlertTriangle className="w-6 h-6 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Peringatan Keuangan Bulanan:</p>
+                                    <p className="text-sm">{monthlyHealth.message}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Card 1: Weekly */}
                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
