@@ -214,6 +214,53 @@ const PublicDashboard = () => {
                 </div>
             </section>
 
+
+            {/* Financial Education Section */}
+            <section className="py-20 px-4 bg-white border-t border-gray-100">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-16">
+                        <span className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">Edukasi</span>
+                        <h2 className="text-3xl font-bold text-gray-900 mt-3 mb-4">Tips Keuangan Cerdas</h2>
+                        <p className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {/* Tip 1 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <PieChart className="w-7 h-7 text-indigo-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Metode 50/30/20</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan (Needs), <span className="font-bold text-gray-700">30%</span> untuk Keinginan (Wants), dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
+                            </p>
+                        </div>
+
+                        {/* Tip 2 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <PiggyBank className="w-7 h-7 text-emerald-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Dana Darurat</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin. Ini adalah jaring pengaman Anda saat terjadi hal tak terduga seperti sakit atau PHK.
+                            </p>
+                        </div>
+
+                        {/* Tip 3 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <Lightbulb className="w-7 h-7 text-amber-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Investasi Leher ke Atas</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">skill dan pengetahuan</span> Anda untuk meningkatkan potensi penghasilan di masa depan.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Stats Section */}
             <section id="stats-section" className="py-24 px-4 bg-gray-50">
                 <div className="max-w-7xl mx-auto">
@@ -382,53 +429,6 @@ const PublicDashboard = () => {
                     </div>
                 </div>
             </section>
-
-            {/* Financial Education Section */}
-            <section className="py-20 px-4 bg-white border-t border-gray-100">
-                <div className="max-w-7xl mx-auto">
-                    <div className="text-center mb-16">
-                        <span className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">Edukasi</span>
-                        <h2 className="text-3xl font-bold text-gray-900 mt-3 mb-4">Tips Keuangan Cerdas</h2>
-                        <p className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</p>
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-8">
-                        {/* Tip 1 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <PieChart className="w-7 h-7 text-indigo-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-3">Metode 50/30/20</h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan (Needs), <span className="font-bold text-gray-700">30%</span> untuk Keinginan (Wants), dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
-                            </p>
-                        </div>
-
-                        {/* Tip 2 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <PiggyBank className="w-7 h-7 text-emerald-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-3">Dana Darurat</h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin. Ini adalah jaring pengaman Anda saat terjadi hal tak terduga seperti sakit atau PHK.
-                            </p>
-                        </div>
-
-                        {/* Tip 3 */}
-                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                <Lightbulb className="w-7 h-7 text-amber-500" />
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-3">Investasi Leher ke Atas</h3>
-                            <p className="text-gray-500 text-sm leading-relaxed">
-                                Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">skill dan pengetahuan</span> Anda untuk meningkatkan potensi penghasilan di masa depan.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <footer className="bg-white border-t py-12 text-center text-gray-400 text-sm">
                 <p>&copy; {new Date().getFullYear()} FinTrack. Dibuat untuk manajemen keuangan yang lebih baik.</p>
             </footer>
