@@ -3,7 +3,7 @@ import { fetchTransactions } from '../lib/api';
 import { calculateStats } from '../utils/calculations';
 import { formatCurrency } from '../utils/format';
 import { Link } from 'react-router-dom';
-import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle } from 'lucide-react';
+import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle, Quote, PieChart, PiggyBank, Lightbulb } from 'lucide-react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -169,6 +169,19 @@ const PublicDashboard = () => {
                             <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
                         </button>
                     </div>
+                </div>
+            </section>
+
+            {/* Quote Section */}
+            <section className="bg-[#1e293b] text-white py-12 px-4 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-32 h-32 bg-lime-400 rounded-full blur-[80px] opacity-20"></div>
+                <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
+                <div className="max-w-4xl mx-auto text-center relative z-10">
+                    <Quote className="w-12 h-12 text-lime-400 mx-auto mb-6 opacity-80" />
+                    <blockquote className="text-xl md:text-2xl font-serif italic leading-relaxed text-gray-200 mb-6">
+                        "Jangan menabung apa yang tersisa setelah membelanjakan, tetapi belanjakan apa yang tersisa setelah menabung."
+                    </blockquote>
+                    <cite className="text-lime-400 font-bold tracking-wide uppercase text-sm">— Warren Buffett</cite>
                 </div>
             </section>
 
@@ -366,6 +379,52 @@ const PublicDashboard = () => {
                                 Menampilkan 10 transaksi terbaru
                             </div>
                         )}
+                    </div>
+                </div>
+            </section>
+
+            {/* Financial Education Section */}
+            <section className="py-20 px-4 bg-white border-t border-gray-100">
+                <div className="max-w-7xl mx-auto">
+                    <div className="text-center mb-16">
+                        <span className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">Edukasi</span>
+                        <h2 className="text-3xl font-bold text-gray-900 mt-3 mb-4">Tips Keuangan Cerdas</h2>
+                        <p className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-8">
+                        {/* Tip 1 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <PieChart className="w-7 h-7 text-indigo-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Metode 50/30/20</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan (Needs), <span className="font-bold text-gray-700">30%</span> untuk Keinginan (Wants), dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
+                            </p>
+                        </div>
+
+                        {/* Tip 2 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <PiggyBank className="w-7 h-7 text-emerald-600" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Dana Darurat</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin. Ini adalah jaring pengaman Anda saat terjadi hal tak terduga seperti sakit atau PHK.
+                            </p>
+                        </div>
+
+                        {/* Tip 3 */}
+                        <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                            <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <Lightbulb className="w-7 h-7 text-amber-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Investasi Leher ke Atas</h3>
+                            <p className="text-gray-500 text-sm leading-relaxed">
+                                Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">skill dan pengetahuan</span> Anda untuk meningkatkan potensi penghasilan di masa depan.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>
