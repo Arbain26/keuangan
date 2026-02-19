@@ -258,8 +258,8 @@ const AdminDashboard = () => {
         <button
             onClick={() => { setActiveTab(id); setIsSidebarOpen(false); }}
             className={`w-full text-left px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center gap-3 mb-1 ${activeTab === id
-                    ? 'bg-[#21262d] text-white shadow-sm border-l-4 border-lime-400'
-                    : 'text-[#8b949e] hover:bg-[#21262d] hover:text-[#c9d1d9]'
+                ? 'bg-[#21262d] text-white shadow-sm border-l-4 border-lime-400'
+                : 'text-[#8b949e] hover:bg-[#21262d] hover:text-[#c9d1d9]'
                 }`}
         >
             <Icon className={`w-5 h-5 ${activeTab === id ? 'text-lime-400' : 'text-[#8b949e]'}`} />
@@ -284,8 +284,7 @@ const AdminDashboard = () => {
                             <Wallet className="w-5 h-5 text-black" />
                         </div>
                         <div>
-                            <h1 className="text-sm font-bold text-white leading-tight">Keuangan App</h1>
-                            <p className="text-[10px] text-[#8b949e] font-medium">Fakultas Ilmu Komputer</p>
+                            <h1 className="text-sm font-bold text-white leading-tight">Keuangan</h1>
                         </div>
                     </div>
                 </div>
