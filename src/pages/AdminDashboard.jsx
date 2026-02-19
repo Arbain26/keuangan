@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { Bar, Line } from 'react-chartjs-2';
+import * as XLSX from 'xlsx';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -29,7 +30,7 @@ ChartJS.register(
 );
 
 const AdminDashboard = () => {
-    const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | profile
+    const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | transactions | reports | profile
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         loadInitialData();
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
     }, []);
 
@@ -80,7 +81,7 @@ const AdminDashboard = () => {
             setProfileData(prev => ({
                 ...prev,
                 email: user.email,
-                fullName: 'Muhammad Arbain' // Hardcoded as requested
+                fullName: 'Muhammad Arbain'
             }));
         }
         setLoading(false);
@@ -110,11 +111,15 @@ const AdminDashboard = () => {
             date: new Date().toISOString().split('T')[0]
         });
         setEditingId(null);
-        const data = await fetchTransactions(); // Reload fresh
+        const data = await fetchTransactions();
         setTransactions(data);
+        if (activeTab === 'dashboard') {
+            setActiveTab('transactions');
+        }
     };
 
     const handleEdit = (transaction) => {
+        setActiveTab('transactions');
         setEditingId(transaction.id);
         setFormData({
             type: transaction.type,
@@ -127,7 +132,7 @@ const AdminDashboard = () => {
     };
 
     const handleDelete = async (id) => {
-        if (confirm('Yakin ingin menghapus transaksi ini?')) {
+        if (confirm('Are you sure you want to delete this transaction?')) {
             await deleteTransaction(id);
             const data = await fetchTransactions();
             setTransactions(data);
@@ -161,11 +166,25 @@ const AdminDashboard = () => {
         const { error } = await supabase.auth.updateUser(updates);
 
         if (error) {
-            setProfileMessage('Gagal: ' + error.message);
+            setProfileMessage('Error: ' + error.message);
         } else {
-            setProfileMessage('Profil diperbarui!');
+            setProfileMessage('Profile updated successfully.');
             setProfileData(prev => ({ ...prev, newPassword: '' }));
         }
+    };
+
+    // --- Export Logic ---
+    const exportToExcel = () => {
+        const worksheet = XLSX.utils.json_to_sheet(filteredTransactions.map(t => ({
+            Date: t.date,
+            Type: t.type,
+            Category: t.category,
+            Amount: t.amount,
+            Description: t.description || '-'
+        })));
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Financial Report");
+        XLSX.writeFile(workbook, `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     // Filter Logic
@@ -192,11 +211,12 @@ const AdminDashboard = () => {
         labels: filteredTransactions.slice(0, 7).reverse().map(t => formatDate(t.date)),
         datasets: [
             {
-                label: 'Transaksi',
+                label: 'Cash Flow',
                 data: filteredTransactions.slice(0, 7).reverse().map(t => t.type === 'pemasukan' ? t.amount : -t.amount),
-                borderColor: '#00ff00',
-                backgroundColor: 'rgba(0, 255, 0, 0.2)',
+                borderColor: '#a3e635', // lime-400
+                backgroundColor: 'rgba(163, 230, 53, 0.1)',
                 tension: 0.4,
+                fill: true,
                 pointRadius: 4,
                 pointHoverRadius: 6
             }
@@ -205,14 +225,16 @@ const AdminDashboard = () => {
 
     const chartOptions = {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: '#000',
-                titleColor: '#00ff00',
-                bodyColor: '#fff',
-                borderColor: '#00ff00',
+                backgroundColor: '#0d1117',
+                titleColor: '#c9d1d9',
+                bodyColor: '#c9d1d9',
+                borderColor: '#30363d',
                 borderWidth: 1,
+                padding: 12,
                 callbacks: {
                     label: (context) => formatCurrency(Math.abs(context.raw))
                 }
@@ -220,49 +242,72 @@ const AdminDashboard = () => {
         },
         scales: {
             y: {
-                grid: { color: '#1a1a1a' },
-                ticks: { color: '#00ff00' }
+                grid: { color: '#30363d', borderDash: [5, 5] },
+                ticks: { color: '#8b949e' },
+                border: { display: false }
             },
             x: {
                 grid: { display: false },
-                ticks: { color: '#00ff00' }
+                ticks: { color: '#8b949e' },
+                border: { display: false }
             }
         }
     };
 
+    const SidebarItem = ({ id, icon: Icon, label }) => (
+        <button
+            onClick={() => { setActiveTab(id); setIsSidebarOpen(false); }}
+            className={`w-full text-left px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center gap-3 mb-1 ${activeTab === id
+                    ? 'bg-[#21262d] text-white shadow-sm border-l-4 border-lime-400'
+                    : 'text-[#8b949e] hover:bg-[#21262d] hover:text-[#c9d1d9]'
+                }`}
+        >
+            <Icon className={`w-5 h-5 ${activeTab === id ? 'text-lime-400' : 'text-[#8b949e]'}`} />
+            {label}
+        </button>
+    );
+
     return (
-        <div className="min-h-screen bg-black text-green-500 font-['Share_Tech_Mono'] selection:bg-green-500 selection:text-black overflow-x-hidden">
+        <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-lime-400/30 selection:text-lime-200">
 
             {/* Top Bar */}
-            <header className="fixed top-0 w-full h-16 bg-[#050505] border-b border-green-900 z-40 flex items-center justify-between px-4 md:px-6 shadow-[0_0_15px_rgba(0,255,0,0.1)]">
+            <header className="fixed top-0 w-full h-16 bg-[#161b22] border-b border-[#30363d] z-40 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="md:hidden text-green-500 hover:text-white transition"
+                        className="md:hidden text-[#8b949e] hover:text-white transition p-2 rounded-lg hover:bg-[#21262d]"
                     >
                         <Menu className="w-6 h-6" />
                     </button>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-green-900/20 rounded-sm border border-green-500 flex items-center justify-center">
-                            <Terminal className="w-5 h-5 text-green-500" />
+                        <div className="w-8 h-8 bg-lime-400 rounded-lg flex items-center justify-center shadow-lg shadow-lime-400/20">
+                            <Wallet className="w-5 h-5 text-black" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-bold tracking-wider text-white leading-none">APLIKASI KEUANGAN</h1>
-                            <p className="text-[10px] text-green-600 tracking-widest uppercase">Fakultas Ilmu Komputer</p>
+                            <h1 className="text-sm font-bold text-white leading-tight">Keuangan App</h1>
+                            <p className="text-[10px] text-[#8b949e] font-medium">Fakultas Ilmu Komputer</p>
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-6">
-                    <span className="hidden md:block text-xs text-green-700 font-bold uppercase tracking-widest">
-                        {user ? 'System Online' : 'Offline'}
-                    </span>
-                    <div className="flex items-center gap-3 border-l border-green-900 pl-6 h-8">
-                        <span className="text-sm font-bold text-white capitalize">
-                            {user?.user_metadata?.full_name || 'Muhammad Arbain'}
+                <div className="flex items-center gap-4">
+                    <div className="hidden md:flex flex-col items-end mr-2">
+                        <span className="text-xs font-medium text-[#8b949e]">
+                            {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}
                         </span>
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_#00ff00]"></div>
-                        <button onClick={handleLogout} className="px-3 py-1 text-xs bg-red-900/20 text-red-500 border border-red-900 hover:bg-red-500 hover:text-black transition uppercase font-bold tracking-wider ml-2">
-                            Logout
+                        <span className="text-xs font-bold text-[#c9d1d9]">
+                            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3 border-l border-[#30363d] pl-4 h-8">
+                        <div className="w-8 h-8 rounded-full bg-[#21262d] flex items-center justify-center border border-[#30363d] text-xs font-bold text-lime-400">
+                            MA
+                        </div>
+                        <div className="hidden md:block">
+                            <p className="text-xs font-bold text-white capitalize">{user?.user_metadata?.full_name || 'Muhammad Arbain'}</p>
+                            <p className="text-[10px] text-[#8b949e]">Administrator</p>
+                        </div>
+                        <button onClick={handleLogout} className="ml-2 p-2 text-[#8b949e] hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                            <LogOut className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
@@ -271,323 +316,368 @@ const AdminDashboard = () => {
             {/* Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm"
+                    className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm transition-opacity"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
             {/* Layout Container */}
-            <div className="pt-16 flex h-screen">
+            <div className="pt-16 flex h-screen overflow-hidden">
 
                 {/* Sidebar */}
-                <aside className={`fixed md:relative z-50 w-64 h-full bg-[#0a0a0a] border-r border-green-900 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
-                    <div className="p-4 space-y-1">
-                        <p className="px-4 text-[10px] text-green-800 uppercase tracking-widest font-bold mb-2">Main Menu</p>
-                        <button
-                            onClick={() => { setActiveTab('dashboard'); setIsSidebarOpen(false); }}
-                            className={`w-full text-left px-4 py-3 text-sm font-bold border-l-2 transition-all hover:bg-green-900/10 hover:text-white group flex items-center gap-3 ${activeTab === 'dashboard' ? 'border-green-500 text-green-400 bg-green-900/20' : 'border-transparent text-gray-500'}`}
-                        >
-                            <LayoutDashboard className="w-4 h-4" />
-                            Dashboard
-                        </button>
-                        <button className="w-full text-left px-4 py-3 text-sm font-bold border-l-2 border-transparent text-gray-600 hover:text-green-700 cursor-not-allowed flex items-center gap-3">
-                            <Activity className="w-4 h-4" />
-                            Kategori (Locked)
-                        </button>
-                        <button className="w-full text-left px-4 py-3 text-sm font-bold border-l-2 border-transparent text-gray-600 hover:text-green-700 cursor-not-allowed flex items-center gap-3">
-                            <FileText className="w-4 h-4" />
-                            Laporan (Locked)
-                        </button>
+                <aside className={`fixed md:relative z-50 w-64 h-full bg-[#161b22] border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+                    <div className="p-4 flex flex-col h-full">
+                        <div className="space-y-1 flex-1">
+                            <p className="px-4 text-[10px] text-[#8b949e] font-bold uppercase tracking-wider mb-3 mt-2">Menu Utama</p>
+                            <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+                            <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" />
+                            <SidebarItem id="reports" icon={FileText} label="Laporan" />
 
-                        <p className="px-4 text-[10px] text-green-800 uppercase tracking-widest font-bold mt-6 mb-2">System</p>
-                        <button
-                            onClick={() => { setActiveTab('profile'); setIsSidebarOpen(false); }}
-                            className={`w-full text-left px-4 py-3 text-sm font-bold border-l-2 transition-all hover:bg-green-900/10 hover:text-white group flex items-center gap-3 ${activeTab === 'profile' ? 'border-green-500 text-green-400 bg-green-900/20' : 'border-transparent text-gray-500'}`}
-                        >
-                            <User className="w-4 h-4" />
-                            User Management
-                        </button>
-                        <Link to="/" target="_blank" className="block w-full text-left px-4 py-3 text-sm font-bold border-l-2 border-transparent text-gray-500 hover:text-white hover:bg-green-900/10 flex items-center gap-3">
-                            <ChevronRight className="w-4 h-4" />
-                            View Site
-                        </Link>
-                    </div>
+                            <p className="px-4 text-[10px] text-[#8b949e] font-bold uppercase tracking-wider mb-3 mt-6">Pengaturan</p>
+                            <SidebarItem id="profile" icon={User} label="Profil User" />
+                            <Link to="/" target="_blank" className="w-full text-left px-4 py-3 text-sm font-medium text-[#8b949e] hover:bg-[#21262d] hover:text-[#c9d1d9] rounded-lg transition-all flex items-center gap-3">
+                                <ChevronRight className="w-5 h-5 text-[#8b949e]" />
+                                Lihat Website
+                            </Link>
+                        </div>
 
-                    <div className="absolute bottom-0 w-full p-4 border-t border-green-900 bg-[#050505]">
-                        <div className="text-[10px] text-green-800">
-                            v2.0.4-CYBER
-                            <br />
-                            SECURE CONNECTION
+                        <div className="p-4 bg-[#0d1117] rounded-xl border border-[#30363d] mt-auto">
+                            <div className="flex items-center gap-3">
+                                <div className="w-2 h-2 rounded-full bg-lime-400 animate-pulse"></div>
+                                <div>
+                                    <p className="text-xs font-bold text-white">System Status</p>
+                                    <p className="text-[10px] text-[#8b949e]">All services operational</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto bg-black p-4 md:p-8 relative">
-                    {/* Background Grid Effect */}
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,0,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none z-0"></div>
+                <main className="flex-1 overflow-y-auto bg-[#0d1117] p-4 md:p-8">
+                    <div className="max-w-6xl mx-auto space-y-8">
 
-                    <div className="relative z-10 max-w-7xl mx-auto">
+                        {/* Page Header */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-[#30363d] pb-6">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white tracking-tight">
+                                    {activeTab === 'dashboard' && 'Dashboard Overview'}
+                                    {activeTab === 'transactions' && 'Manajemen Transaksi'}
+                                    {activeTab === 'reports' && 'Laporan Keuangan'}
+                                    {activeTab === 'profile' && 'Pengaturan Akun'}
+                                </h2>
+                                <p className="text-[#8b949e] text-sm mt-1">
+                                    {activeTab === 'dashboard' && 'Ringkasan aktivitas keuangan Anda hari ini.'}
+                                    {activeTab === 'transactions' && 'Kelola pemasukan dan pengeluaran dengan mudah.'}
+                                    {activeTab === 'reports' && 'Analisis dan unduh laporan keuangan.'}
+                                    {activeTab === 'profile' && 'Perbarui informasi dan keamanan akun Anda.'}
+                                </p>
+                            </div>
+                            {activeTab === 'reports' && (
+                                <button
+                                    onClick={exportToExcel}
+                                    className="flex items-center gap-2 px-4 py-2 bg-lime-400 text-black text-sm font-bold rounded-lg hover:bg-lime-500 transition shadow-lg shadow-lime-400/20"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    Download Excel
+                                </button>
+                            )}
+                        </div>
 
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6">
-                                {/* Header Section */}
-                                <div className="border border-green-500/30 bg-[#050505] p-6 relative overflow-hidden group">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                                        <div>
-                                            <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 uppercase tracking-wide drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
-                                                Dashboard Keuangan
-                                            </h2>
-                                            <p className="text-green-500/70 text-sm tracking-wider uppercase font-bold">
-                                                Sistem Monitoring Keuangan Real-time
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-4xl md:text-5xl font-bold text-green-400 font-mono tracking-widest drop-shadow-[0_0_10px_#00ff00]">
-                                                {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-                                            </div>
-                                            <div className="text-green-700 text-sm font-bold uppercase tracking-[0.2em] mt-1">
-                                                {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Filter Section */}
-                                <div className="border border-green-500/30 bg-[#050505] p-4">
-                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-green-900">
-                                        <Filter className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm font-bold text-green-400 uppercase tracking-widest">Filter Periode</span>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                        <div className="md:col-span-5">
-                                            <label className="block text-[10px] uppercase font-bold text-green-700 mb-1">Tanggal Awal</label>
-                                            <input
-                                                type="date"
-                                                value={dateFilter.startDate}
-                                                onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
-                                                className="w-full bg-black border border-green-800 text-white p-2 text-sm focus:border-green-400 focus:outline-none focus:shadow-[0_0_10px_rgba(0,255,0,0.2)] transition placeholder-green-900"
-                                            />
-                                        </div>
-                                        <div className="md:col-span-5">
-                                            <label className="block text-[10px] uppercase font-bold text-green-700 mb-1">Tanggal Akhir</label>
-                                            <input
-                                                type="date"
-                                                value={dateFilter.endDate}
-                                                onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
-                                                className="w-full bg-black border border-green-800 text-white p-2 text-sm focus:border-green-400 focus:outline-none focus:shadow-[0_0_10px_rgba(0,255,0,0.2)] transition"
-                                            />
-                                        </div>
-                                        <div className="md:col-span-2 flex gap-2">
-                                            <button
-                                                onClick={() => {/* Filter logic happens automatically */ }}
-                                                className="flex-1 bg-green-600 hover:bg-green-500 text-black font-bold p-2 text-sm transition uppercase tracking-wider"
-                                            >
-                                                Filter
-                                            </button>
-                                            <button
-                                                onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                                                className="px-3 border border-green-800 text-green-600 hover:text-white hover:border-white transition"
-                                            >
-                                                X
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
                                 {/* Stats Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {/* Income Card - Green */}
-                                    <div className="bg-[#050505] border border-green-500/50 p-6 relative group overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-bl-full -mr-10 -mt-10 group-hover:bg-green-500/20 transition"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-2 mb-3 text-green-500">
-                                                <DollarSign className="w-5 h-5" />
-                                                <span className="text-xs font-bold uppercase tracking-widest">Total Pemasukan</span>
+                                    {/* Income */}
+                                    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pemasukan</p>
+                                                <h3 className="text-2xl font-bold text-white">{formatCurrency(totalIncome)}</h3>
                                             </div>
-                                            <div className="text-3xl font-bold text-white tracking-wider mb-2 drop-shadow-[0_0_5px_rgba(0,255,0,0.5)]">
-                                                {formatCurrency(totalIncome)}
-                                            </div>
-                                            <div className="text-[10px] text-green-700 font-bold uppercase tracking-widest flex justify-between">
-                                                <span>Periode Aktif</span>
-                                                <span className="animate-pulse">REAL-TIME</span>
+                                            <div className="p-2 bg-lime-400/10 rounded-lg">
+                                                <TrendingUp className="w-5 h-5 text-lime-400" />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Expense Card - Pink */}
-                                    <div className="bg-[#050505] border border-pink-500/50 p-6 relative group overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-20 h-20 bg-pink-500/10 rounded-bl-full -mr-10 -mt-10 group-hover:bg-pink-500/20 transition"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-2 mb-3 text-pink-500">
-                                                <Zap className="w-5 h-5" />
-                                                <span className="text-xs font-bold uppercase tracking-widest">Total Pengeluaran</span>
+                                    {/* Expense */}
+                                    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pengeluaran</p>
+                                                <h3 className="text-2xl font-bold text-white">{formatCurrency(totalExpense)}</h3>
                                             </div>
-                                            <div className="text-3xl font-bold text-white tracking-wider mb-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">
-                                                {formatCurrency(totalExpense)}
-                                            </div>
-                                            <div className="text-[10px] text-pink-700 font-bold uppercase tracking-widest flex justify-between">
-                                                <span>Periode Aktif</span>
-                                                <span className="animate-pulse">REAL-TIME</span>
+                                            <div className="p-2 bg-rose-500/10 rounded-lg">
+                                                <TrendingDown className="w-5 h-5 text-rose-500" />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Balance Card - Blue/Cyan */}
-                                    <div className="bg-[#050505] border border-cyan-500/50 p-6 relative group overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/10 rounded-bl-full -mr-10 -mt-10 group-hover:bg-cyan-500/20 transition"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-2 mb-3 text-cyan-500">
-                                                <Wallet className="w-5 h-5" />
-                                                <span className="text-xs font-bold uppercase tracking-widest">Saldo Akhir</span>
+                                    {/* Balance */}
+                                    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-[#8b949e] mb-1">Saldo Bersih</p>
+                                                <h3 className="text-2xl font-bold text-white">{formatCurrency(balance)}</h3>
                                             </div>
-                                            <div className="text-3xl font-bold text-white tracking-wider mb-2 drop-shadow-[0_0_5px_rgba(6,182,212,0.5)]">
-                                                {formatCurrency(balance)}
-                                            </div>
-                                            <div className="text-[10px] text-cyan-700 font-bold uppercase tracking-widest flex justify-between">
-                                                <span>Selisih Pemasukan & Pengeluaran</span>
-                                                <span>+ POSITIF</span>
+                                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                                                <Wallet className="w-5 h-5 text-blue-500" />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Graph & Input Section Grid */}
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                                    {/* Chart - Left 8 cols */}
-                                    <div className="lg:col-span-8 bg-[#050505] border border-green-500/30 p-6">
-                                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-green-900/50">
-                                            <Activity className="w-5 h-5 text-green-500" />
-                                            <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest">Analisis Grafik</h3>
-                                        </div>
-                                        <div className="h-64">
-                                            <Line options={chartOptions} data={chartData} />
-                                        </div>
+                                {/* Chart */}
+                                <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-lg font-bold text-white">Analisis Cash Flow</h3>
                                     </div>
+                                    <div className="h-72">
+                                        <Line options={chartOptions} data={chartData} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                                    {/* Input Form - Right 4 cols */}
-                                    <div className="lg:col-span-4 bg-[#050505] border border-green-500/30 p-6">
-                                        <div className="flex items-center justify-between gap-2 mb-6 pb-2 border-b border-green-900/50">
-                                            <div className="flex items-center gap-2">
-                                                <Plus className="w-5 h-5 text-green-500" />
-                                                <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest">{editingId ? 'Edit Data' : 'Tambah Data'}</h3>
-                                            </div>
-                                            {editingId && <button onClick={cancelEdit} className="text-[10px] text-red-500 border border-red-500 px-2 hover:bg-red-500 hover:text-black transition">CANCEL</button>}
+                        {activeTab === 'transactions' && (
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                {/* Input Form */}
+                                <div className="lg:col-span-1 space-y-6">
+                                    <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
+                                        <div className="flex items-center justify-between gap-2 mb-6">
+                                            <h3 className="text-lg font-bold text-white">{editingId ? 'Edit Transaksi' : 'Transaksi Baru'}</h3>
+                                            {editingId && <button onClick={cancelEdit} className="text-xs text-rose-400 hover:text-rose-300 hover:underline">Batal Edit</button>}
                                         </div>
 
                                         <form onSubmit={handleSubmit} className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-2 gap-3 p-1 bg-[#0d1117] rounded-lg border border-[#30363d]">
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, type: 'pemasukan' })}
-                                                    className={`py-2 text-xs font-bold border transition ${formData.type === 'pemasukan' ? 'bg-green-500 text-black border-green-500' : 'text-gray-500 border-green-900 hover:border-green-500 hover:text-green-500'}`}
+                                                    className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pemasukan' ? 'bg-lime-400 text-black shadow-md' : 'text-[#8b949e] hover:text-[#c9d1d9]'}`}
                                                 >
-                                                    PEMASUKAN
+                                                    Pemasukan
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, type: 'pengeluaran' })}
-                                                    className={`py-2 text-xs font-bold border transition ${formData.type === 'pengeluaran' ? 'bg-pink-500 text-black border-pink-500' : 'text-gray-500 border-pink-900/50 hover:border-pink-500 hover:text-pink-500'}`}
+                                                    className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pengeluaran' ? 'bg-rose-600 text-white shadow-md' : 'text-[#8b949e] hover:text-[#c9d1d9]'}`}
                                                 >
-                                                    PENGELUARAN
+                                                    Pengeluaran
                                                 </button>
                                             </div>
 
-                                            <input
-                                                type="date"
-                                                value={formData.date}
-                                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                                className="w-full bg-black border border-green-900 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition"
-                                                required
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="JUMLAH (RP)"
-                                                value={formData.amount}
-                                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                                className="w-full bg-black border border-green-900 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition font-mono"
-                                                required
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="KATEGORI"
-                                                value={formData.category}
-                                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                                className="w-full bg-black border border-green-900 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition"
-                                                required
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="KETERANGAN (OPSIONAL)"
-                                                value={formData.description}
-                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                                className="w-full bg-black border border-green-900 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition"
-                                            />
+                                            <div>
+                                                <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Tanggal</label>
+                                                <div className="relative">
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b949e]" />
+                                                    <input
+                                                        type="date"
+                                                        value={formData.date}
+                                                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                                        className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
 
-                                            <button type="submit" className="w-full bg-green-600/20 border border-green-500 text-green-500 hover:bg-green-500 hover:text-black py-3 font-bold uppercase tracking-widest transition duration-300 shadow-[0_0_15px_rgba(0,255,0,0.1)] hover:shadow-[0_0_20px_rgba(0,255,0,0.4)]">
-                                                {editingId ? 'SIMPAN PERUBAHAN' : 'EKSEKUSI DATA'}
+                                            <div>
+                                                <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Jumlah</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8b949e] text-sm font-bold">Rp</span>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="0"
+                                                        value={formData.amount}
+                                                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                                        className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 pl-10 pr-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition font-medium"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Kategori & Keterangan</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Kategori (mis: Makan, Gaji)"
+                                                    value={formData.category}
+                                                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                                    className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition mb-3"
+                                                    required
+                                                />
+                                                <textarea
+                                                    placeholder="Catatan tambahan (opsional)"
+                                                    value={formData.description}
+                                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                    className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition min-h-[80px]"
+                                                />
+                                            </div>
+
+                                            <button type="submit" className="w-full bg-lime-400 text-black font-bold py-3 rounded-lg text-sm hover:bg-lime-500 transition shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2">
+                                                <Save className="w-4 h-4" />
+                                                {editingId ? 'Simpan Perubahan' : 'Simpan Transaksi'}
                                             </button>
                                         </form>
                                     </div>
                                 </div>
 
                                 {/* Transaction List */}
-                                <div className="border border-green-500/30 bg-[#050505]">
-                                    <div className="p-4 border-b border-green-900/50 flex justify-between items-center">
-                                        <h3 className="text-sm font-bold text-green-400 uppercase tracking-widest">Data Stream Log</h3>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-700" />
-                                            <input
-                                                type="text"
-                                                placeholder="SEARCH QUERY..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="bg-black border border-green-900 pl-10 pr-4 py-1 text-xs text-white focus:border-green-500 focus:outline-none w-48 transition uppercase placeholder-green-900"
-                                            />
+                                <div className="lg:col-span-2">
+                                    <div className="bg-[#161b22] border border-[#30363d] rounded-xl shadow-sm overflow-hidden">
+                                        <div className="p-5 border-b border-[#30363d] flex flex-col md:flex-row justify-between items-center gap-4">
+                                            <h3 className="font-bold text-white">Riwayat Transaksi</h3>
+                                            <div className="relative w-full md:w-64">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b949e]" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Cari transaksi..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                    className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2 pl-10 pr-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm text-[#8b949e]">
+                                                <thead className="bg-[#0d1117] text-[#8b949e] font-semibold border-b border-[#30363d]">
+                                                    <tr>
+                                                        <th className="px-6 py-4 w-1/4">Tanggal</th>
+                                                        <th className="px-6 py-4 w-1/4">Kategori</th>
+                                                        <th className="px-6 py-4 w-1/4">Nominal</th>
+                                                        <th className="px-6 py-4 w-1/4 text-right">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-[#30363d]">
+                                                    {loading ? (
+                                                        <tr><td colSpan="4" className="text-center py-12 text-[#8b949e]">Memuat data...</td></tr>
+                                                    ) : filteredTransactions.length === 0 ? (
+                                                        <tr><td colSpan="4" className="text-center py-12 text-[#8b949e]">Belum ada transaksi.</td></tr>
+                                                    ) : (
+                                                        filteredTransactions.map((t) => (
+                                                            <tr key={t.id} className="hover:bg-[#21262d] transition">
+                                                                <td className="px-6 py-4">
+                                                                    <div className="text-[#c9d1d9] font-medium">{formatDate(t.date)}</div>
+                                                                    <div className="text-xs text-[#8b949e]">{new Date(t.date).getFullYear()}</div>
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-lime-400' : 'bg-rose-500'}`}></span>
+                                                                        <span className="text-[#c9d1d9] font-medium">{t.category}</span>
+                                                                    </div>
+                                                                    {t.description && <div className="text-xs text-[#8b949e] mt-1 truncate max-w-[150px]">{t.description}</div>}
+                                                                </td>
+                                                                <td className="px-6 py-4">
+                                                                    <span className={`font-medium ${t.type === 'pemasukan' ? 'text-lime-400' : 'text-rose-400'}`}>
+                                                                        {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-right">
+                                                                    <div className="flex justify-end gap-2">
+                                                                        <button onClick={() => handleEdit(t)} className="p-2 text-[#8b949e] hover:text-white hover:bg-[#30363d] rounded-lg transition" title="Edit">
+                                                                            <Edit2 className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button onClick={() => handleDelete(t.id)} className="p-2 text-[#8b949e] hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition" title="Delete">
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'reports' && (
+                            <div className="space-y-6">
+                                {/* Filter & Export */}
+                                <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
+                                    <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                                            <div>
+                                                <label className="block text-xs font-bold text-[#8b949e] uppercase tracking-wider mb-2">Periode Awal</label>
+                                                <input
+                                                    type="date"
+                                                    value={dateFilter.startDate}
+                                                    onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+                                                    className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2 px-4 text-sm focus:border-lime-400 outline-none transition"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-[#8b949e] uppercase tracking-wider mb-2">Periode Akhir</label>
+                                                <input
+                                                    type="date"
+                                                    value={dateFilter.endDate}
+                                                    onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+                                                    className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2 px-4 text-sm focus:border-lime-400 outline-none transition"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-3 w-full md:w-auto">
+                                            <button
+                                                onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                                                className="px-4 py-2 border border-[#30363d] text-[#8b949e] hover:bg-[#21262d] hover:text-white rounded-lg transition text-sm font-medium"
+                                            >
+                                                Reset
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Report Summary */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="p-6 bg-lime-400/5 border border-lime-400/10 rounded-xl">
+                                        <h3 className="text-lime-400 text-xs font-bold uppercase tracking-wider mb-2">Total Pemasukan</h3>
+                                        <p className="text-3xl text-white font-bold">{formatCurrency(totalIncome)}</p>
+                                    </div>
+                                    <div className="p-6 bg-rose-500/5 border border-rose-500/10 rounded-xl">
+                                        <h3 className="text-rose-500 text-xs font-bold uppercase tracking-wider mb-2">Total Pengeluaran</h3>
+                                        <p className="text-3xl text-white font-bold">{formatCurrency(totalExpense)}</p>
+                                    </div>
+                                    <div className="p-6 bg-[#21262d] border border-[#30363d] rounded-xl">
+                                        <h3 className="text-[#8b949e] text-xs font-bold uppercase tracking-wider mb-2">Saldo Tertahan</h3>
+                                        <p className="text-3xl text-white font-bold">{formatCurrency(balance)}</p>
+                                    </div>
+                                </div>
+
+                                {/* Report Table Preview */}
+                                <div className="bg-[#161b22] border border-[#30363d] rounded-xl overflow-hidden shadow-sm">
+                                    <div className="p-5 border-b border-[#30363d]">
+                                        <h3 className="font-bold text-white">Preview Data Laporan</h3>
+                                    </div>
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-sm text-gray-400">
-                                            <thead className="bg-green-900/20 text-green-500 text-xs uppercase font-bold tracking-wider">
+                                        <table className="w-full text-left text-sm text-[#8b949e]">
+                                            <thead className="bg-[#0d1117] text-[#8b949e] font-semibold">
                                                 <tr>
-                                                    <th className="px-6 py-3">Timestamp</th>
-                                                    <th className="px-6 py-3">Category</th>
-                                                    <th className="px-6 py-3">Value</th>
-                                                    <th className="px-6 py-3 text-right">Action</th>
+                                                    <th className="px-6 py-3 w-32">Tanggal</th>
+                                                    <th className="px-6 py-3 w-24">Tipe</th>
+                                                    <th className="px-6 py-3 w-32">Kategori</th>
+                                                    <th className="px-6 py-3">Keterangan</th>
+                                                    <th className="px-6 py-3 text-right w-32">Jumlah</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-green-900/30">
-                                                {loading ? (
-                                                    <tr><td colSpan="4" className="text-center py-8 text-green-800 animate-pulse">LOADING DATA STREAM...</td></tr>
-                                                ) : filteredTransactions.length === 0 ? (
-                                                    <tr><td colSpan="4" className="text-center py-8 text-green-800">NO DATA FOUND</td></tr>
+                                            <tbody className="divide-y divide-[#30363d]">
+                                                {filteredTransactions.length === 0 ? (
+                                                    <tr><td colSpan="5" className="text-center py-8 text-[#8b949e]">Tidak ada data untuk periode ini.</td></tr>
                                                 ) : (
-                                                    filteredTransactions.map((t) => (
-                                                        <tr key={t.id} className="hover:bg-green-900/10 transition group">
-                                                            <td className="px-6 py-4 font-mono text-xs">
-                                                                <div className="text-white">{formatDate(t.date)}</div>
-                                                                <div className="text-[10px] text-gray-600">{new Date(t.date).getFullYear()}</div>
-                                                            </td>
-                                                            <td className="px-6 py-4">
-                                                                <span className="text-white font-bold">{t.category}</span>
-                                                                {t.description && <div className="text-[10px] text-gray-500 font-mono mt-1">{t.description}</div>}
-                                                            </td>
-                                                            <td className="px-6 py-4 font-mono font-bold">
-                                                                <span className={t.type === 'pemasukan' ? 'text-green-400 drop-shadow-[0_0_2px_#00ff00]' : 'text-pink-500 drop-shadow-[0_0_2px_#ec4899]'}>
-                                                                    {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                    filteredTransactions.map(t => (
+                                                        <tr key={t.id}>
+                                                            <td className="px-6 py-3 text-[#c9d1d9]">{formatDate(t.date)}</td>
+                                                            <td className="px-6 py-3">
+                                                                <span className={`text-xs px-2 py-1 rounded font-medium capitalize ${t.type === 'pemasukan' ? 'bg-lime-400/10 text-lime-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                                    {t.type}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <div className="flex justify-end gap-2">
-                                                                    <button onClick={() => handleEdit(t)} className="text-green-500 hover:text-white hover:bg-green-500 p-1 transition border border-transparent hover:border-green-400">
-                                                                        <Edit2 className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button onClick={() => handleDelete(t.id)} className="text-pink-500 hover:text-white hover:bg-pink-500 p-1 transition border border-transparent hover:border-pink-400">
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
+                                                            <td className="px-6 py-3 text-[#c9d1d9]">{t.category}</td>
+                                                            <td className="px-6 py-3 truncate max-w-xs">{t.description || '-'}</td>
+                                                            <td className={`px-6 py-3 text-right font-medium ${t.type === 'pemasukan' ? 'text-lime-400' : 'text-[#c9d1d9]'}`}>
+                                                                {formatCurrency(t.amount)}
                                                             </td>
                                                         </tr>
                                                     ))
@@ -600,33 +690,37 @@ const AdminDashboard = () => {
                         )}
 
                         {activeTab === 'profile' && (
-                            <div className="max-w-2xl mx-auto border border-green-500/30 bg-[#050505] p-8">
-                                <h2 className="text-2xl font-bold text-white mb-6 uppercase tracking-widest border-b border-green-900 pb-4">
-                                    <span className="text-green-500">##</span> User Configuration
+                            <div className="max-w-2xl mx-auto bg-[#161b22] border border-[#30363d] rounded-xl p-8 shadow-sm">
+                                <h2 className="text-xl font-bold text-white mb-6 border-b border-[#30363d] pb-4">
+                                    Pengaturan Profil
                                 </h2>
 
                                 {profileMessage && (
-                                    <div className="mb-6 p-4 border border-green-500/50 bg-green-500/10 text-green-400 text-sm font-mono">
-                                        {'>'} {profileMessage}
+                                    <div className="mb-6 p-4 rounded-lg border border-lime-400/20 bg-lime-400/10 text-lime-400 text-sm flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-lime-400"></div>
+                                        {profileMessage}
                                     </div>
                                 )}
 
                                 <form onSubmit={handleUpdateProfile} className="space-y-6">
                                     <div>
-                                        <label className="block text-xs font-bold text-green-600 uppercase tracking-wider mb-2">System Identity (Email)</label>
-                                        <input type="text" value={profileData.email} disabled className="w-full bg-[#111] border border-green-900 text-gray-500 p-3 text-sm cursor-not-allowed" />
+                                        <label className="block text-sm font-medium text-[#8b949e] mb-2">Email Akun</label>
+                                        <input type="text" value={profileData.email} disabled className="w-full bg-[#0d1117] border border-[#30363d] text-[#8b949e] rounded-lg p-3 text-sm cursor-not-allowed" />
+                                        <p className="text-xs text-[#8b949e] mt-1">Email tidak dapat diubah.</p>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-green-600 uppercase tracking-wider mb-2">Display Name</label>
-                                        <input type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-black border border-green-800 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition" />
+                                        <label className="block text-sm font-medium text-[#8b949e] mb-2">Nama Lengkap</label>
+                                        <input type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-[#0d1117] border border-[#30363d] text-white rounded-lg p-3 text-sm focus:border-lime-400 outline-none transition" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-green-600 uppercase tracking-wider mb-2">Update Access Key (Password)</label>
-                                        <input type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="LEAVE EMPTY TO KEEP CURRENT" className="w-full bg-black border border-green-800 text-white p-3 text-sm focus:border-green-500 focus:outline-none transition" />
+                                        <label className="block text-sm font-medium text-[#8b949e] mb-2">Password Baru</label>
+                                        <input type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="Biarkan kosong jika tidak ingin mengganti" className="w-full bg-[#0d1117] border border-[#30363d] text-white rounded-lg p-3 text-sm focus:border-lime-400 outline-none transition" />
                                     </div>
-                                    <button type="submit" className="px-8 py-3 bg-green-600 text-black font-bold uppercase tracking-wider hover:bg-green-500 transition shadow-[0_0_15px_rgba(0,255,0,0.2)]">
-                                        Save Configuration
-                                    </button>
+                                    <div className="pt-4">
+                                        <button type="submit" className="px-6 py-2.5 bg-lime-400 text-black font-medium rounded-lg hover:bg-lime-500 transition shadow-lg shadow-lime-400/20 w-full md:w-auto">
+                                            Simpan Perubahan
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
                         )}
