@@ -43,6 +43,18 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="*"
+            element={
+              <div className="min-h-screen bg-black text-green-500 flex flex-col items-center justify-center font-['Share_Tech_Mono']">
+                <h1 className="text-6xl font-bold mb-4 drop-shadow-[0_0_10px_#00ff00]">404</h1>
+                <p className="text-xl uppercase tracking-widest mb-8">Page Not Found / System Error</p>
+                <a href="/" className="px-6 py-2 border border-green-500 hover:bg-green-500 hover:text-black transition uppercase">
+                  Return to Dashboard
+                </a>
+              </div>
+            }
+          />
         </Routes>
       </div>
     </Router>
