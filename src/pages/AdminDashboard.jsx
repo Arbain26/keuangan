@@ -69,7 +69,7 @@ const AdminDashboard = () => {
     }, []);
 
     useEffect(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo(0, 0);
     }, [activeTab]);
 
     const loadInitialData = async () => {
@@ -272,10 +272,10 @@ const AdminDashboard = () => {
     );
 
     return (
-        <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-lime-400/30 selection:text-lime-200 flex flex-col">
+        <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-lime-400/30 selection:text-lime-200">
 
             {/* Top Bar */}
-            <header className="fixed top-0 left-0 right-0 h-16 bg-[#161b22] border-b border-[#30363d] z-[60] flex items-center justify-between px-4 md:px-6">
+            <header className="fixed top-0 w-full h-16 bg-[#161b22] border-b border-[#30363d] z-50 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -325,7 +325,7 @@ const AdminDashboard = () => {
             )}
 
             {/* Layout Container */}
-            <div className="pt-16 flex flex-1">
+            <div className="pt-16 flex min-h-screen">
 
                 {/* Sidebar */}
                 <aside className={`fixed md:relative z-50 w-64 h-full bg-[#161b22] border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
@@ -357,7 +357,7 @@ const AdminDashboard = () => {
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 bg-[#0d1117] p-4 md:p-8 min-w-0">
+                <main className="flex-1 bg-[#0d1117] p-4 md:p-8">
                     <div className="max-w-6xl mx-auto space-y-8">
 
                         {/* Page Header */}
@@ -542,7 +542,7 @@ const AdminDashboard = () => {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="overflow-x-auto">
+                                        <div className="hidden md:block overflow-x-auto">
                                             <table className="w-full text-left text-sm text-[#8b949e]">
                                                 <thead className="bg-[#0d1117] text-[#8b949e] font-semibold border-b border-[#30363d]">
                                                     <tr>
