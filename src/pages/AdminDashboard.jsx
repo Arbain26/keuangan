@@ -121,7 +121,7 @@ const AdminDashboard = () => {
             setActiveTab('transactions');
         }
         // Ensure success feedback or scroll
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo(0, 0);
     };
 
     const handleEdit = (transaction) => {
@@ -134,7 +134,7 @@ const AdminDashboard = () => {
             description: transaction.description || '',
             date: transaction.date
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.scrollTo(0, 0);
     };
 
     const handleDelete = async (id) => {
@@ -195,8 +195,8 @@ const AdminDashboard = () => {
 
     // Filter Logic
     const filteredTransactions = transactions.filter(t => {
-        const matchesSearch = t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            t.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = (t.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+            (t.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
         const tDate = new Date(t.date);
         const now = new Date();
@@ -316,7 +316,7 @@ const AdminDashboard = () => {
         <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-lime-400/30 selection:text-lime-200">
 
             {/* Top Bar */}
-            <header className="fixed top-0 w-full h-16 bg-[#161b22]/90 backdrop-blur-md border-b border-[#30363d] z-50 flex items-center justify-between px-4 md:px-6">
+            <header className="fixed top-0 w-full h-16 bg-[#161b22] border-b border-[#30363d] z-50 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -604,7 +604,7 @@ const AdminDashboard = () => {
                                                             <tr key={t.id} className="hover:bg-[#21262d] transition">
                                                                 <td className="px-6 py-4">
                                                                     <div className="text-[#c9d1d9] font-medium">{formatDate(t.date)}</div>
-                                                                    <div className="text-xs text-[#8b949e]">{new Date(t.date).getFullYear()}</div>
+                                                                    <div className="text-xs text-[#8b949e]">{t.date ? new Date(t.date).getFullYear() : ''}</div>
                                                                 </td>
                                                                 <td className="px-6 py-4">
                                                                     <div className="flex items-center gap-2">
@@ -644,7 +644,7 @@ const AdminDashboard = () => {
                                                     <div key={t.id} className="bg-[#0d1117] border border-[#30363d] rounded-lg p-4 space-y-3">
                                                         <div className="flex justify-between items-start border-b border-[#30363d] pb-2">
                                                             <div>
-                                                                <p className="text-xs text-[#8b949e]">{formatDate(t.date)} {new Date(t.date).getFullYear()}</p>
+                                                                <p className="text-xs text-[#8b949e]">{formatDate(t.date)} {t.date ? new Date(t.date).getFullYear() : ''}</p>
                                                                 <div className="flex items-center gap-2 mt-1">
                                                                     <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-lime-400' : 'bg-rose-500'}`}></span>
                                                                     <span className="text-[#c9d1d9] font-bold">{t.category}</span>
