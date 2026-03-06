@@ -48,11 +48,11 @@ const AdminDashboard = () => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Filter State
     const [dateFilter, setDateFilter] = useState({
         startDate: '',
         endDate: ''
     });
+    const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
 
     // Profile Form State
     const [profileData, setProfileData] = useState({
@@ -120,6 +120,8 @@ const AdminDashboard = () => {
         if (activeTab === 'dashboard') {
             setActiveTab('transactions');
         }
+        // Ensure success feedback or scroll
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleEdit = (transaction) => {
@@ -197,12 +199,29 @@ const AdminDashboard = () => {
             t.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
         const tDate = new Date(t.date);
+        const now = new Date();
+
+        let matchesPeriod = true;
+        if (activePeriod === 'week') {
+            const startOfWeek = new Date(now);
+            const day = now.getDay() || 7; // Get current day (1-7, where 7 is Sunday)
+            startOfWeek.setDate(now.getDate() - day + 1); // Monday
+            startOfWeek.setHours(0, 0, 0, 0);
+            matchesPeriod = tDate >= startOfWeek;
+        } else if (activePeriod === 'month') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            matchesPeriod = tDate >= startOfMonth;
+        } else if (activePeriod === 'year') {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            matchesPeriod = tDate >= startOfYear;
+        }
+
         const startDate = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
         const endDate = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
 
         const matchesDate = (!startDate || tDate >= startDate) && (!endDate || tDate <= endDate);
 
-        return matchesSearch && matchesDate;
+        return matchesSearch && matchesDate && matchesPeriod;
     });
 
     // Stats Calculation
@@ -271,17 +290,39 @@ const AdminDashboard = () => {
         </button>
     );
 
+    const FilterButtons = () => (
+        <div className="flex flex-wrap gap-2 mb-4">
+            {[
+                { id: 'all', label: 'Semua' },
+                { id: 'week', label: 'Minggu Ini' },
+                { id: 'month', label: 'Bulan Ini' },
+                { id: 'year', label: 'Tahun Ini' }
+            ].map((period) => (
+                <button
+                    key={period.id}
+                    onClick={() => setActivePeriod(period.id)}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all border ${activePeriod === period.id
+                        ? 'bg-lime-400 text-black border-lime-400 shadow-sm'
+                        : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:border-[#8b949e] hover:text-[#c9d1d9]'
+                        }`}
+                >
+                    {period.label}
+                </button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9] font-sans selection:bg-lime-400/30 selection:text-lime-200">
 
             {/* Top Bar */}
-            <header className="fixed top-0 w-full h-16 bg-[#161b22] border-b border-[#30363d] z-50 flex items-center justify-between px-4 md:px-6">
+            <header className="fixed top-0 w-full h-16 bg-[#161b22]/90 backdrop-blur-md border-b border-[#30363d] z-50 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                        className="md:hidden text-[#8b949e] hover:text-white transition p-2 rounded-lg hover:bg-[#21262d]"
+                        className="md:hidden text-[#8b949e] hover:text-white transition p-2 rounded-lg hover:bg-[#21262d] active:scale-95"
                     >
-                        <Menu className="w-6 h-6" />
+                        {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-lime-400 rounded-lg flex items-center justify-center shadow-lg shadow-lime-400/20">
@@ -319,16 +360,16 @@ const AdminDashboard = () => {
             {/* Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/80 z-40 md:hidden backdrop-blur-sm transition-opacity"
+                    className="fixed inset-0 bg-black/60 z-[60] md:hidden backdrop-blur-sm transition-opacity duration-300"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
             {/* Layout Container */}
-            <div className="pt-16 flex min-h-screen">
+            <div className="pt-16 flex min-h-screen relative overflow-hidden">
 
                 {/* Sidebar */}
-                <aside className={`fixed md:relative z-50 w-64 h-full bg-[#161b22] border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+                <aside className={`fixed top-0 left-0 bottom-0 md:relative z-[70] w-72 md:w-64 h-screen md:h-auto bg-[#161b22] border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 overflow-y-auto shadow-2xl md:shadow-none`}>
                     <div className="p-4 flex flex-col h-full">
                         <div className="space-y-1 flex-1">
                             <p className="px-4 text-[10px] text-[#8b949e] font-bold uppercase tracking-wider mb-3 mt-2">Menu Utama</p>
@@ -389,6 +430,7 @@ const AdminDashboard = () => {
 
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6">
+                                <FilterButtons />
                                 {/* Stats Cards */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {/* Income */}
@@ -632,6 +674,7 @@ const AdminDashboard = () => {
 
                         {activeTab === 'reports' && (
                             <div className="space-y-6">
+                                <FilterButtons />
                                 {/* Filter & Export */}
                                 <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
                                     <div className="flex flex-col md:flex-row justify-between items-end gap-6">

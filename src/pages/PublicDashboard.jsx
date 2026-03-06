@@ -38,18 +38,31 @@ const PublicDashboard = () => {
     });
     const [transactions, setTransactions] = useState([]); // Store raw list
     const [loading, setLoading] = useState(true);
+    const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
 
     useEffect(() => {
         const loadData = async () => {
+            setLoading(true);
             const data = await fetchTransactions();
-            const calculatedCurrentStats = calculateStats(data);
-            setStats(calculatedCurrentStats);
             setTransactions(data);
+
+            // Determine if we should use custom date range or standard period for stats
+            let refDate = new Date(selectedYear, selectedMonth, 1);
+
+            // If custom range is active, we might want to adjust how stats are shown
+            // For now, let's keep stats tied to period/month selecting for clarity
+            // and have the list/history respond to both.
+
+            const calculatedCurrentStats = calculateStats(data, refDate);
+            setStats(calculatedCurrentStats);
             setLoading(false);
         };
 
         loadData();
-    }, []);
+    }, [selectedMonth, selectedYear]);
 
     const chartData = {
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
@@ -116,6 +129,44 @@ const PublicDashboard = () => {
 
     const weeklyHealth = getFinancialHealth(stats.weeklyIncome, stats.weeklyExpense);
     const monthlyHealth = getFinancialHealth(stats.monthlyIncome, stats.monthlyExpense);
+
+    // Filter Logic for Transaction List
+    const filteredTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date);
+        const tMonth = tDate.getMonth();
+        const tYear = tDate.getFullYear();
+        const now = new Date();
+
+        // 1. Check Date Range Filter
+        const startDate = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
+        const endDate = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
+        if (startDate) startDate.setHours(0, 0, 0, 0);
+        if (endDate) endDate.setHours(23, 59, 59, 999);
+
+        const matchesCustomDate = (!startDate || tDate >= startDate) && (!endDate || tDate <= endDate);
+        if (!matchesCustomDate) return false;
+
+        // 2. Check Period Filter (only if no custom date filter is set, or if we want to combine)
+        // Usually, manual date filtering overrides quick periods.
+        if (dateFilter.startDate || dateFilter.endDate) return true;
+
+        if (activePeriod === 'week') {
+            const startOfWeek = new Date(now);
+            const day = now.getDay() || 7;
+            startOfWeek.setDate(now.getDate() - day + 1);
+            startOfWeek.setHours(0, 0, 0, 0);
+            return tDate >= startOfWeek;
+        } else if (activePeriod === 'month') {
+            return tMonth === selectedMonth && tYear === selectedYear;
+        } else if (activePeriod === 'year') {
+            return tYear === selectedYear;
+        }
+        return true;
+    });
+
+    // Stats for Selected Range (Custom Date Filter)
+    const rangeIncome = filteredTransactions.filter(t => t.type === 'pemasukan').reduce((acc, t) => acc + Number(t.amount), 0);
+    const rangeExpense = filteredTransactions.filter(t => t.type === 'pengeluaran').reduce((acc, t) => acc + Number(t.amount), 0);
 
     // Animation Variants
     const fadeInUp = {
@@ -318,9 +369,123 @@ const PublicDashboard = () => {
                     variants={fadeInUp}
                     className="max-w-7xl mx-auto"
                 >
-                    <div className="text-center mb-16">
+                    <div className="text-center mb-10">
                         <h2 className="text-3xl font-bold text-gray-900 mb-4">Ringkasan Keuangan</h2>
                         <p className="text-gray-500">Data berikut diambil secara real-time dari database.</p>
+                    </div>
+
+                    <div className="flex flex-col gap-6 mb-10">
+                        {/* Quick Period Filter Buttons */}
+                        <div className="flex flex-wrap justify-center gap-2">
+                            {[
+                                { id: 'all', label: 'Semua' },
+                                { id: 'week', label: 'Minggu Ini' },
+                                { id: 'month', label: 'Bulan Ini' },
+                                { id: 'year', label: 'Tahun Ini' }
+                            ].map((period) => (
+                                <button
+                                    key={period.id}
+                                    onClick={() => {
+                                        setActivePeriod(period.id);
+                                        if (period.id === 'month' || period.id === 'all') {
+                                            setSelectedMonth(new Date().getMonth());
+                                            setSelectedYear(new Date().getFullYear());
+                                        }
+                                    }}
+                                    className={`px-4 py-2 text-sm font-bold rounded-full transition-all border ${activePeriod === period.id
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200'
+                                        : 'bg-white text-gray-500 border-gray-200 hover:border-blue-400 hover:text-blue-600'
+                                        }`}
+                                >
+                                    {period.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Custom Date Range Filter */}
+                        <div className="bg-[#1e293b] p-6 rounded-2xl shadow-xl border border-gray-700 max-w-4xl mx-auto w-full text-gray-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 tracking-wider">Periode Awal</label>
+                                    <input
+                                        type="date"
+                                        value={dateFilter.startDate}
+                                        onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
+                                        className="w-full bg-[#0d1117] border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 tracking-wider">Periode Akhir</label>
+                                    <input
+                                        type="date"
+                                        value={dateFilter.endDate}
+                                        onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
+                                        className="w-full bg-[#0d1117] border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2 lg:col-span-1">
+                                    <button
+                                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
+                                        className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 px-6 rounded-lg text-sm border border-gray-600 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        Reset Filter
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Range Results Summary - ONLY SHOWN WHEN FILTER ACTIVE */}
+                            {(dateFilter.startDate || dateFilter.endDate) && (
+                                <div className="mt-6 pt-6 border-t border-gray-700 grid grid-cols-2 gap-4">
+                                    <div className="bg-[#0d1117] p-4 rounded-xl border border-green-900/30">
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Pemasukan (Range)</p>
+                                        <p className="text-xl font-bold text-green-500">{formatCurrency(rangeIncome)}</p>
+                                    </div>
+                                    <div className="bg-[#0d1117] p-4 rounded-xl border border-red-900/30">
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Pengeluaran (Range)</p>
+                                        <p className="text-xl font-bold text-red-500">{formatCurrency(rangeExpense)}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Custom Month/Year Dropdowns - Re-added for convenience */}
+                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 bg-white p-6 rounded-2xl border-2 border-blue-50 shadow-sm max-w-xl mx-auto w-full">
+                            <div className="flex items-center gap-2 mb-2 sm:mb-0">
+                                <span className="text-blue-600 font-bold text-xs uppercase tracking-wider">Cari Per Bulan:</span>
+                            </div>
+                            <div className="flex-1 w-full">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Bulan</label>
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => {
+                                        setSelectedMonth(parseInt(e.target.value));
+                                        setActivePeriod('month');
+                                        setDateFilter({ startDate: '', endDate: '' }); // Clear custom range search
+                                    }}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
+                                >
+                                    {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((month, idx) => (
+                                        <option key={idx} value={idx}>{month}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex-1 w-full">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Tahun</label>
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => {
+                                        setSelectedYear(parseInt(e.target.value));
+                                        setActivePeriod('year');
+                                        setDateFilter({ startDate: '', endDate: '' }); // Clear custom range search
+                                    }}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
+                                >
+                                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                                        <option key={year} value={year}>{year}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
@@ -390,7 +555,7 @@ const PublicDashboard = () => {
                                 </div>
                             </div>
                             <div className="mt-4 text-gray-400 text-xs">
-                                Bulan ini
+                                {activePeriod === 'month' ? `Bulan ${['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][selectedMonth]} ${selectedYear}` : 'Bulan ini'}
                             </div>
                         </div>
 
@@ -413,7 +578,7 @@ const PublicDashboard = () => {
                                 </div>
                             </div>
                             <div className="mt-4 text-gray-400 text-xs">
-                                Tahun berjalan
+                                {activePeriod === 'year' ? `Tahun ${selectedYear}` : 'Tahun berjalan'}
                             </div>
                         </div>
 
@@ -455,7 +620,7 @@ const PublicDashboard = () => {
                                 <tbody className="bg-white divide-y divide-gray-100">
                                     {loading ? (
                                         <tr><td colSpan="3" className="px-8 py-8 text-center text-gray-500">Memuat data...</td></tr>
-                                    ) : transactions.slice(0, 10).map((t) => ( // Show only top 10
+                                    ) : filteredTransactions.slice(0, 10).map((t) => ( // Show only top 10 from filtered
                                         <tr key={t.id} className="hover:bg-gray-50/50 transition">
                                             <td className="px-8 py-4 whitespace-nowrap text-sm text-gray-600">
                                                 {new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -469,15 +634,15 @@ const PublicDashboard = () => {
                                             </td>
                                         </tr>
                                     ))}
-                                    {!loading && transactions.length === 0 && (
-                                        <tr><td colSpan="3" className="px-8 py-8 text-center text-gray-500 italic">Belum ada transaksi tercatat.</td></tr>
+                                    {!loading && filteredTransactions.length === 0 && (
+                                        <tr><td colSpan="3" className="px-8 py-8 text-center text-gray-500 italic">Belum ada transaksi tercatat untuk periode ini.</td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        {!loading && transactions.length > 10 && (
+                        {!loading && filteredTransactions.length > 10 && (
                             <div className="p-4 bg-gray-50 text-center text-xs text-gray-400">
-                                Menampilkan 10 transaksi terbaru
+                                Menampilkan 10 transaksi terbaru untuk periode terpilih
                             </div>
                         )}
                     </div>
@@ -486,7 +651,7 @@ const PublicDashboard = () => {
             <footer className="bg-white border-t py-12 text-center text-gray-400 text-sm">
                 <p>&copy; {new Date().getFullYear()} FinTrack. Dibuat untuk manajemen keuangan yang lebih baik.</p>
             </footer>
-        </div>
+        </div >
     );
 };
 

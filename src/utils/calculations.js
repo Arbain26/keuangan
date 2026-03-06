@@ -1,6 +1,6 @@
 // Native JS implementation to avoid extra dependencies if simple
-export const calculateStats = (transactions) => {
-    const now = new Date();
+export const calculateStats = (transactions, referenceDate = new Date()) => {
+    const now = new Date(referenceDate);
     const oneWeekAgo = new Date(now);
     oneWeekAgo.setDate(now.getDate() - 7);
 
