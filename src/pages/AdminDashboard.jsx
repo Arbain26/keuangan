@@ -360,7 +360,7 @@ const AdminDashboard = () => {
             {/* Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/60 z-[60] md:hidden backdrop-blur-sm transition-opacity duration-300"
+                    className="fixed inset-0 bg-black/70 z-[80] md:hidden backdrop-blur-sm transition-opacity duration-300"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
@@ -369,7 +369,7 @@ const AdminDashboard = () => {
             <div className="pt-16 flex min-h-screen relative overflow-hidden">
 
                 {/* Sidebar */}
-                <aside className={`fixed top-0 left-0 bottom-0 md:relative z-[70] w-72 md:w-64 h-screen md:h-auto bg-[#161b22] border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 overflow-y-auto shadow-2xl md:shadow-none`}>
+                <aside className={`fixed top-0 left-0 bottom-0 md:relative z-[90] w-72 md:w-64 h-screen md:h-auto bg-slate-900 border-r border-[#30363d] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 flex flex-col overflow-y-auto shadow-2xl md:shadow-none`}>
                     <div className="p-4 flex flex-col h-full">
                         <div className="space-y-1 flex-1">
                             <p className="px-4 text-[10px] text-[#8b949e] font-bold uppercase tracking-wider mb-3 mt-2">Menu Utama</p>
