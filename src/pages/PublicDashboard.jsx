@@ -402,52 +402,6 @@ const PublicDashboard = () => {
                             ))}
                         </div>
 
-                        {/* Custom Date Range Filter */}
-                        <div className="bg-[#1e293b] p-6 rounded-2xl shadow-xl border border-gray-700 max-w-4xl mx-auto w-full text-gray-200">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 tracking-wider">Periode Awal</label>
-                                    <input
-                                        type="date"
-                                        value={dateFilter.startDate}
-                                        onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
-                                        className="w-full bg-[#0d1117] border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1 tracking-wider">Periode Akhir</label>
-                                    <input
-                                        type="date"
-                                        value={dateFilter.endDate}
-                                        onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
-                                        className="w-full bg-[#0d1117] border border-gray-600 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition text-white"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2 lg:col-span-1">
-                                    <button
-                                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                                        className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 px-6 rounded-lg text-sm border border-gray-600 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        Reset Filter
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Range Results Summary - ONLY SHOWN WHEN FILTER ACTIVE */}
-                            {(dateFilter.startDate || dateFilter.endDate) && (
-                                <div className="mt-6 pt-6 border-t border-gray-700 grid grid-cols-2 gap-4">
-                                    <div className="bg-[#0d1117] p-4 rounded-xl border border-green-900/30">
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Pemasukan (Range)</p>
-                                        <p className="text-xl font-bold text-green-500">{formatCurrency(rangeIncome)}</p>
-                                    </div>
-                                    <div className="bg-[#0d1117] p-4 rounded-xl border border-red-900/30">
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Total Pengeluaran (Range)</p>
-                                        <p className="text-xl font-bold text-red-500">{formatCurrency(rangeExpense)}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
                         {/* Custom Month/Year Dropdowns - Re-added for convenience */}
                         <div className="flex flex-col sm:flex-row justify-center items-center gap-4 bg-white p-6 rounded-2xl border-2 border-blue-50 shadow-sm max-w-xl mx-auto w-full">
                             <div className="flex items-center gap-2 mb-2 sm:mb-0">
