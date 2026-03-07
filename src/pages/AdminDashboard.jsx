@@ -48,10 +48,6 @@ const AdminDashboard = () => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const [dateFilter, setDateFilter] = useState({
-        startDate: '',
-        endDate: ''
-    });
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
 
     // Profile Form State
@@ -234,12 +230,7 @@ const AdminDashboard = () => {
             matchesPeriod = tDate >= startOfYear;
         }
 
-        const startDate = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
-        const endDate = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
-
-        const matchesDate = (!startDate || tDate >= startDate) && (!endDate || tDate <= endDate);
-
-        return matchesSearch && matchesDate && matchesPeriod;
+        return matchesSearch && matchesPeriod;
     });
 
     // Stats Calculation
@@ -698,41 +689,6 @@ const AdminDashboard = () => {
 
                                 {activeTab === 'reports' && (
                                     <div className="space-y-6">
-                                        <FilterButtons />
-                                        {/* Filter & Export */}
-                                        <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
-                                            <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-[#8b949e] uppercase tracking-wider mb-2">Periode Awal</label>
-                                                        <input
-                                                            type="date"
-                                                            value={dateFilter.startDate}
-                                                            onChange={(e) => setDateFilter({ ...dateFilter, startDate: e.target.value })}
-                                                            className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2 px-4 text-sm focus:border-lime-400 outline-none transition"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-[#8b949e] uppercase tracking-wider mb-2">Periode Akhir</label>
-                                                        <input
-                                                            type="date"
-                                                            value={dateFilter.endDate}
-                                                            onChange={(e) => setDateFilter({ ...dateFilter, endDate: e.target.value })}
-                                                            className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2 px-4 text-sm focus:border-lime-400 outline-none transition"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-3 w-full md:w-auto">
-                                                    <button
-                                                        onClick={() => setDateFilter({ startDate: '', endDate: '' })}
-                                                        className="px-4 py-2 border border-[#30363d] text-[#8b949e] hover:bg-[#21262d] hover:text-white rounded-lg transition text-sm font-medium"
-                                                    >
-                                                        Reset
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
                                         {/* Report Summary */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div className="p-6 bg-lime-400/5 border border-lime-400/10 rounded-xl">

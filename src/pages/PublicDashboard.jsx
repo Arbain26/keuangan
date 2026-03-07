@@ -41,7 +41,6 @@ const PublicDashboard = () => {
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
 
     useEffect(() => {
         const loadData = async () => {
@@ -137,19 +136,6 @@ const PublicDashboard = () => {
         const tYear = tDate.getFullYear();
         const now = new Date();
 
-        // 1. Check Date Range Filter
-        const startDate = dateFilter.startDate ? new Date(dateFilter.startDate) : null;
-        const endDate = dateFilter.endDate ? new Date(dateFilter.endDate) : null;
-        if (startDate) startDate.setHours(0, 0, 0, 0);
-        if (endDate) endDate.setHours(23, 59, 59, 999);
-
-        const matchesCustomDate = (!startDate || tDate >= startDate) && (!endDate || tDate <= endDate);
-        if (!matchesCustomDate) return false;
-
-        // 2. Check Period Filter (only if no custom date filter is set, or if we want to combine)
-        // Usually, manual date filtering overrides quick periods.
-        if (dateFilter.startDate || dateFilter.endDate) return true;
-
         if (activePeriod === 'week') {
             const startOfWeek = new Date(now);
             const day = now.getDay() || 7;
@@ -163,10 +149,6 @@ const PublicDashboard = () => {
         }
         return true;
     });
-
-    // Stats for Selected Range (Custom Date Filter)
-    const rangeIncome = filteredTransactions.filter(t => t.type === 'pemasukan').reduce((acc, t) => acc + Number(t.amount), 0);
-    const rangeExpense = filteredTransactions.filter(t => t.type === 'pengeluaran').reduce((acc, t) => acc + Number(t.amount), 0);
 
     // Animation Variants
     const fadeInUp = {
@@ -414,7 +396,6 @@ const PublicDashboard = () => {
                                     onChange={(e) => {
                                         setSelectedMonth(parseInt(e.target.value));
                                         setActivePeriod('month');
-                                        setDateFilter({ startDate: '', endDate: '' }); // Clear custom range search
                                     }}
                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
                                 >
@@ -430,7 +411,6 @@ const PublicDashboard = () => {
                                     onChange={(e) => {
                                         setSelectedYear(parseInt(e.target.value));
                                         setActivePeriod('year');
-                                        setDateFilter({ startDate: '', endDate: '' }); // Clear custom range search
                                     }}
                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
                                 >
