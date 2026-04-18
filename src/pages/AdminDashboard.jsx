@@ -420,16 +420,20 @@ const AdminDashboard = () => {
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-[#30363d] pb-6">
                                     <div>
                                         <h2 className="text-2xl font-bold text-white tracking-tight">
-                                            {activeTab === 'dashboard' && 'Dashboard Overview'}
-                                            {activeTab === 'transactions' && 'Manajemen Transaksi'}
-                                            {activeTab === 'reports' && 'Laporan Keuangan'}
-                                            {activeTab === 'profile' && 'Pengaturan Akun'}
+                                            {{
+                                                dashboard: 'Dashboard Overview',
+                                                transactions: 'Manajemen Transaksi',
+                                                reports: 'Laporan Keuangan',
+                                                profile: 'Pengaturan Akun'
+                                            }[activeTab]}
                                         </h2>
                                         <p className="text-[#8b949e] text-sm mt-1">
-                                            {activeTab === 'dashboard' && 'Ringkasan aktivitas keuangan Anda hari ini.'}
-                                            {activeTab === 'transactions' && 'Kelola pemasukan dan pengeluaran dengan mudah.'}
-                                            {activeTab === 'reports' && 'Analisis dan unduh laporan keuangan.'}
-                                            {activeTab === 'profile' && 'Perbarui informasi dan keamanan akun Anda.'}
+                                            {{
+                                                dashboard: 'Ringkasan aktivitas keuangan Anda hari ini.',
+                                                transactions: 'Kelola pemasukan dan pengeluaran dengan mudah.',
+                                                reports: 'Analisis dan unduh laporan keuangan.',
+                                                profile: 'Perbarui informasi dan keamanan akun Anda.'
+                                            }[activeTab]}
                                         </p>
                                     </div>
                                     {activeTab === 'reports' && (
