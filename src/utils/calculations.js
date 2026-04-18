@@ -1,11 +1,16 @@
 // Native JS implementation to avoid extra dependencies if simple
 export const calculateStats = (transactions, referenceDate = new Date()) => {
-    const now = new Date(referenceDate);
-    const oneWeekAgo = new Date(now);
-    oneWeekAgo.setDate(now.getDate() - 7);
+    // For Month/Year stats, respect the selected referenceDate
+    const refNow = new Date(referenceDate);
+    const currentMonth = refNow.getMonth();
+    const currentYear = refNow.getFullYear();
 
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    // For Weekly stats, always use the real current date (last 7 days)
+    const actualNow = new Date();
+    actualNow.setHours(23, 59, 59, 999);
+    const oneWeekAgo = new Date(actualNow);
+    oneWeekAgo.setDate(actualNow.getDate() - 7);
+    oneWeekAgo.setHours(0, 0, 0, 0);
 
     let weeklyExpense = 0;
     let monthlyExpense = 0;
@@ -27,8 +32,8 @@ export const calculateStats = (transactions, referenceDate = new Date()) => {
         const isThisYear = tDate.getFullYear() === currentYear;
 
         if (t.type === 'pengeluaran') {
-            // Weekly: Last 7 days
-            if (tDate >= oneWeekAgo && tDate <= now) {
+            // Weekly: Last 7 days (relative to real today)
+            if (tDate >= oneWeekAgo && tDate <= actualNow) {
                 weeklyExpense += amount;
             }
 
@@ -43,8 +48,8 @@ export const calculateStats = (transactions, referenceDate = new Date()) => {
                 monthlyChartDataExpense[tDate.getMonth()] += amount;
             }
         } else if (t.type === 'pemasukan') {
-            // Weekly: Last 7 days
-            if (tDate >= oneWeekAgo && tDate <= now) {
+            // Weekly: Last 7 days (relative to real today)
+            if (tDate >= oneWeekAgo && tDate <= actualNow) {
                 weeklyIncome += amount;
             }
 
