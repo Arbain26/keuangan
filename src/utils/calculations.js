@@ -1,3 +1,24 @@
+// Safe date parsing to avoid timezone offset shifting for YYYY-MM-DD strings
+export const parseSafeDate = (dateString) => {
+    if (!dateString) return new Date();
+    if (typeof dateString === 'string') {
+        const cleanString = dateString.split('T')[0];
+        if (cleanString.includes('-')) {
+            const parts = cleanString.split('-');
+            if (parts.length === 3) {
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const day = parseInt(parts[2], 10);
+                const date = new Date(year, month, day);
+                if (!isNaN(date.getTime())) {
+                    return date;
+                }
+            }
+        }
+    }
+    return new Date(dateString);
+};
+
 // Native JS implementation to avoid extra dependencies if simple
 export const calculateStats = (transactions, referenceDate = new Date()) => {
     // For Month/Year stats, respect the selected referenceDate
@@ -25,7 +46,7 @@ export const calculateStats = (transactions, referenceDate = new Date()) => {
     const monthlyChartDataIncome = Array(12).fill(0);
 
     transactions.forEach(t => {
-        const tDate = new Date(t.date);
+        const tDate = parseSafeDate(t.date);
         const amount = Number(t.amount);
 
         // Yearly Check (Common for chart)

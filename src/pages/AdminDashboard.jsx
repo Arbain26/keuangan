@@ -4,8 +4,10 @@ import { fetchTransactions, createTransaction, deleteTransaction, updateTransact
 import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { Link } from 'react-router-dom';
-import { Bar, Line } from 'react-chartjs-2';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import { parseSafeDate } from '../utils/calculations';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -16,6 +18,7 @@ import {
     Legend,
     PointElement,
     LineElement,
+    ArcElement,
 } from 'chart.js';
 
 ChartJS.register(
@@ -26,8 +29,21 @@ ChartJS.register(
     Tooltip,
     Legend,
     PointElement,
-    LineElement
+    LineElement,
+    ArcElement
 );
+
+const CATEGORIES = [
+    { id: 'Makanan & Minuman', label: 'Makanan & Minuman', icon: '🍔' },
+    { id: 'Transportasi', label: 'Transportasi', icon: '🚗' },
+    { id: 'Belanja', label: 'Belanja', icon: '🛍️' },
+    { id: 'Hiburan', label: 'Hiburan/Rekreasi', icon: '🎬' },
+    { id: 'Utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },
+    { id: 'Kesehatan', label: 'Kesehatan', icon: '🏥' },
+    { id: 'Gaji', label: 'Gaji/Pendapatan', icon: '💵' },
+    { id: 'Investasi', label: 'Investasi', icon: '📈' },
+    { id: 'Lainnya', label: 'Lainnya (Kustom)', icon: '📝' }
+];
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | transactions | reports | profile
@@ -57,6 +73,23 @@ const AdminDashboard = () => {
         newPassword: ''
     });
     const [profileMessage, setProfileMessage] = useState('');
+
+    // Additional Premium states
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [toast, setToast] = useState(null);
+    const [isCustomCategory, setIsCustomCategory] = useState(false);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+    };
+
+    // Auto-dismiss toast
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
 
     const loadInitialData = async () => {
         setLoading(true);
@@ -92,12 +125,15 @@ const AdminDashboard = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.amount || !formData.date || !formData.category) return;
+        setIsSubmitting(true);
 
         try {
             if (editingId) {
                 await updateTransaction(editingId, formData);
+                showToast('Transaksi berhasil diperbarui!');
             } else {
                 await createTransaction(formData);
+                showToast('Transaksi berhasil ditambahkan!');
             }
 
             setFormData({
@@ -108,6 +144,7 @@ const AdminDashboard = () => {
                 date: new Date().toISOString().split('T')[0]
             });
             setEditingId(null);
+            setIsCustomCategory(false);
             const data = await fetchTransactions();
             setTransactions(Array.isArray(data) ? data : []);
             if (activeTab === 'dashboard') {
@@ -115,6 +152,9 @@ const AdminDashboard = () => {
             }
         } catch (error) {
             console.error('Error submitting transaction:', error);
+            showToast('Gagal menyimpan transaksi.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
         window.scrollTo(0, 0);
     };
@@ -130,17 +170,21 @@ const AdminDashboard = () => {
             description: transaction.description || '',
             date: transaction.date || new Date().toISOString().split('T')[0]
         });
+        const isStd = CATEGORIES.some(cat => cat.id === transaction.category);
+        setIsCustomCategory(!isStd && transaction.category !== '');
         window.scrollTo(0, 0);
     };
 
     const handleDelete = async (id) => {
-        if (confirm('Are you sure you want to delete this transaction?')) {
+        if (confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) {
             try {
                 await deleteTransaction(id);
+                showToast('Transaksi berhasil dihapus!');
                 const data = await fetchTransactions();
                 setTransactions(Array.isArray(data) ? data : []);
             } catch (error) {
                 console.error('Error deleting transaction:', error);
+                showToast('Gagal menghapus transaksi.', 'error');
             }
         }
     };
@@ -154,11 +198,13 @@ const AdminDashboard = () => {
             description: '',
             date: new Date().toISOString().split('T')[0]
         });
+        setIsCustomCategory(false);
     };
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
         setProfileMessage('');
+        setIsSubmitting(true);
 
         const updates = {
             data: { full_name: profileData.fullName }
@@ -168,13 +214,25 @@ const AdminDashboard = () => {
             updates.password = profileData.newPassword;
         }
 
-        const { error } = await supabase.auth.updateUser(updates);
+        try {
+            const { data, error } = await supabase.auth.updateUser(updates);
 
-        if (error) {
-            setProfileMessage('Error: ' + error.message);
-        } else {
-            setProfileMessage('Profile updated successfully.');
-            setProfileData(prev => ({ ...prev, newPassword: '' }));
+            if (error) {
+                setProfileMessage('Error: ' + error.message);
+                showToast('Gagal memperbarui profil: ' + error.message, 'error');
+            } else {
+                setProfileMessage('Profil berhasil diperbarui.');
+                showToast('Profil berhasil diperbarui!');
+                setProfileData(prev => ({ ...prev, newPassword: '' }));
+                if (data?.user) {
+                    setUser(data.user);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('Terjadi kesalahan jaringan.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -212,7 +270,7 @@ const AdminDashboard = () => {
         const matchesSearch = (t.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (t.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
-        const tDate = new Date(t.date);
+        const tDate = parseSafeDate(t.date);
         const now = new Date();
 
         let matchesPeriod = true;
@@ -238,13 +296,33 @@ const AdminDashboard = () => {
     const totalExpense = filteredTransactions.filter(t => t.type === 'pengeluaran').reduce((acc, t) => acc + Number(t.amount), 0);
     const balance = totalIncome - totalExpense;
 
+    // Group transactions by date for line chart
+    const aggregatedFlow = {};
+    filteredTransactions.forEach(t => {
+        const dateStr = formatDate(t.date);
+        const amount = Number(t.amount);
+        const net = t.type === 'pemasukan' ? amount : -amount;
+        aggregatedFlow[dateStr] = (aggregatedFlow[dateStr] || 0) + net;
+    });
+
+    const distinctDates = [];
+    filteredTransactions.forEach(t => {
+        const dateStr = formatDate(t.date);
+        if (!distinctDates.includes(dateStr)) {
+            distinctDates.push(dateStr);
+        }
+    });
+
+    const chartDates = distinctDates.slice(0, 7).reverse();
+    const chartNetFlows = chartDates.map(d => aggregatedFlow[d] || 0);
+
     // Chart Data
     const chartData = {
-        labels: filteredTransactions.slice(0, 7).reverse().map(t => formatDate(t.date)),
+        labels: chartDates.length > 0 ? chartDates : ['Belum Ada Data'],
         datasets: [
             {
-                label: 'Cash Flow',
-                data: filteredTransactions.slice(0, 7).reverse().map(t => t.type === 'pemasukan' ? t.amount : -t.amount),
+                label: 'Arus Kas Bersih',
+                data: chartNetFlows.length > 0 ? chartNetFlows : [0],
                 borderColor: '#a3e635', // lime-400
                 backgroundColor: 'rgba(163, 230, 53, 0.1)',
                 tension: 0.4,
@@ -253,6 +331,72 @@ const AdminDashboard = () => {
                 pointHoverRadius: 6
             }
         ]
+    };
+
+    // Doughnut Chart Data for Admin Dashboard (based on filteredTransactions)
+    const expenseByCategory = {};
+    filteredTransactions.forEach(t => {
+        if (t.type === 'pengeluaran') {
+            const category = t.category || 'Lainnya';
+            expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
+        }
+    });
+
+    const doughnutLabels = Object.keys(expenseByCategory);
+    const doughnutData = Object.values(expenseByCategory);
+
+    const categoryChartData = {
+        labels: doughnutLabels.length > 0 ? doughnutLabels : ['Tidak Ada Pengeluaran'],
+        datasets: [
+            {
+                data: doughnutData.length > 0 ? doughnutData : [1],
+                backgroundColor: doughnutData.length > 0 ? [
+                    'rgba(163, 230, 53, 0.7)',   // Lime-400
+                    'rgba(59, 130, 246, 0.7)',   // Blue-500
+                    'rgba(245, 158, 11, 0.7)',   // Amber-500
+                    'rgba(139, 92, 246, 0.7)',   // Purple-500
+                    'rgba(236, 72, 153, 0.7)',   // Pink-500
+                    'rgba(239, 68, 68, 0.7)',    // Red-500
+                    'rgba(6, 182, 212, 0.7)',    // Cyan-500
+                    'rgba(107, 114, 128, 0.7)',  // Gray-500
+                ] : ['rgba(48, 54, 61, 0.5)'],
+                borderColor: doughnutData.length > 0 ? [
+                    '#a3e635', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#ef4444', '#06b6d4', '#6b7280'
+                ] : ['#30363d'],
+                borderWidth: 1,
+            }
+        ]
+    };
+
+    const categoryChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    boxWidth: 10,
+                    color: '#8b949e',
+                    font: { size: 10 }
+                }
+            },
+            tooltip: {
+                backgroundColor: '#0d1117',
+                titleColor: '#c9d1d9',
+                bodyColor: '#c9d1d9',
+                borderColor: '#30363d',
+                borderWidth: 1,
+                callbacks: {
+                    label: (context) => {
+                        if (doughnutData.length === 0) return 'Belum ada pengeluaran';
+                        const value = context.raw;
+                        const total = doughnutData.reduce((a, b) => a + b, 0);
+                        const percentage = ((value / total) * 100).toFixed(1);
+                        return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+                    }
+                }
+            }
+        }
     };
 
     const chartOptions = {
@@ -492,15 +636,28 @@ const AdminDashboard = () => {
                                             </div>
                                         </div>
 
-                                        {/* Chart */}
-                                        <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
-                                            <div className="flex items-center justify-between mb-6">
-                                                <h3 className="text-lg font-bold text-white">Analisis Cash Flow</h3>
-                                            </div>
-                                            <div className="h-72">
-                                                <Line options={chartOptions} data={chartData} />
-                                            </div>
-                                        </div>
+                                        {/* Charts Grid */}
+                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                             {/* Line Chart */}
+                                             <div className="lg:col-span-2 bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
+                                                 <div className="flex items-center justify-between mb-6">
+                                                     <h3 className="text-lg font-bold text-white">Analisis Arus Kas</h3>
+                                                 </div>
+                                                 <div className="h-72">
+                                                     <Line options={chartOptions} data={chartData} />
+                                                 </div>
+                                             </div>
+ 
+                                             {/* Doughnut Chart */}
+                                             <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm flex flex-col justify-between">
+                                                 <div className="flex items-center justify-between mb-4">
+                                                     <h3 className="text-lg font-bold text-white">Distribusi Pengeluaran</h3>
+                                                 </div>
+                                                 <div className="h-64 flex items-center justify-center">
+                                                     <Doughnut options={categoryChartOptions} data={categoryChartData} />
+                                                 </div>
+                                             </div>
+                                         </div>
                                     </div>
                                 )}
 
@@ -562,27 +719,67 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Kategori & Keterangan</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Kategori (mis: Makan, Gaji)"
-                                                            value={formData.category}
-                                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                                            className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition mb-3"
-                                                            required
-                                                        />
-                                                        <textarea
-                                                            placeholder="Catatan tambahan (opsional)"
-                                                            value={formData.description}
-                                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                                            className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition min-h-[80px]"
-                                                        />
-                                                    </div>
+                                                         <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Kategori</label>
+                                                         <select
+                                                             value={isCustomCategory ? 'Lainnya' : (CATEGORIES.some(c => c.id === formData.category) ? formData.category : (formData.category ? 'Lainnya' : ''))}
+                                                             onChange={(e) => {
+                                                                 const val = e.target.value;
+                                                                 if (val === 'Lainnya') {
+                                                                     setIsCustomCategory(true);
+                                                                     setFormData({ ...formData, category: '' });
+                                                                 } else {
+                                                                     setIsCustomCategory(false);
+                                                                     setFormData({ ...formData, category: val });
+                                                                 }
+                                                             }}
+                                                             className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition mb-3 cursor-pointer"
+                                                             required
+                                                         >
+                                                             <option value="" disabled>-- Pilih Kategori --</option>
+                                                             {CATEGORIES.map(cat => (
+                                                                 <option key={cat.id} value={cat.id}>
+                                                                     {cat.icon} {cat.label}
+                                                                 </option>
+                                                             ))}
+                                                         </select>
 
-                                                    <button type="submit" className="w-full bg-lime-400 text-black font-bold py-3 rounded-lg text-sm hover:bg-lime-500 transition shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2">
-                                                        <Save className="w-4 h-4" />
-                                                        {editingId ? 'Simpan Perubahan' : 'Simpan Transaksi'}
-                                                    </button>
+                                                         {isCustomCategory && (
+                                                             <input
+                                                                 type="text"
+                                                                 placeholder="Ketik Kategori Kustom..."
+                                                                 value={formData.category}
+                                                                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                                                 className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition mb-3"
+                                                                 required
+                                                             />
+                                                         )}
+
+                                                         <label className="block text-xs font-medium text-[#8b949e] mb-1.5 pl-1">Keterangan / Catatan</label>
+                                                         <textarea
+                                                             placeholder="Catatan tambahan (opsional)"
+                                                             value={formData.description}
+                                                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                             className="w-full bg-[#0d1117] border border-[#30363d] text-[#c9d1d9] rounded-lg py-2.5 px-4 text-sm focus:border-lime-400 focus:ring-1 focus:ring-lime-400 outline-none transition min-h-[80px]"
+                                                         />
+                                                     </div>
+
+                                                     <button 
+                                                         type="submit" 
+                                                         disabled={isSubmitting}
+                                                         className="w-full bg-lime-400 text-black font-bold py-3 rounded-lg text-sm hover:bg-lime-500 transition shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                     >
+                                                         {isSubmitting ? (
+                                                             <>
+                                                                 <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                                                                 <span>Menyimpan...</span>
+                                                             </>
+                                                         ) : (
+                                                             <>
+                                                                 <Save className="w-4 h-4" />
+                                                                 <span>{editingId ? 'Simpan Perubahan' : 'Simpan Transaksi'}</span>
+                                                             </>
+                                                         )}
+                                                     </button>
                                                 </form>
                                             </div>
                                         </div>
@@ -792,6 +989,24 @@ const AdminDashboard = () => {
                     </div>
                 </main>
             </div>
+            {/* Toast System Rendering */}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                        className={`fixed bottom-6 right-6 z-[100] px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 border font-medium text-sm ${
+                            toast.type === 'error'
+                                ? 'bg-rose-950 text-rose-200 border-rose-800'
+                                : 'bg-slate-900 text-lime-200 border-lime-800/50'
+                        }`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${toast.type === 'error' ? 'bg-rose-500' : 'bg-lime-400 animate-ping'}`} />
+                        {toast.message}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
