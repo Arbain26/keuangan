@@ -422,6 +422,12 @@ const AdminDashboard = () => {
             const worksheet = workbook.worksheets[0]; // Get first sheet
             
             const transactionsToImport = [];
+            // Gunakan Set untuk mendeteksi duplikat (baik dari DB maupun dalam file excel itu sendiri)
+            const seenSignatures = new Set(
+                transactions.map(t => `${t.date}_${t.type}_${t.category}_${t.amount}_${t.description || ''}`)
+            );
+            let skippedCount = 0;
+
             worksheet.eachRow((row, rowNumber) => {
                 if (rowNumber === 1) return; // Skip header
                 
@@ -441,13 +447,19 @@ const AdminDashboard = () => {
                 const description = (row.getCell(5).value || '').toString();
                 
                 if (amount > 0) {
-                    transactionsToImport.push({
-                        date: dateStr,
-                        type,
-                        category,
-                        amount,
-                        description
-                    });
+                    const signature = `${dateStr}_${type}_${category}_${amount}_${description}`;
+                    if (seenSignatures.has(signature)) {
+                        skippedCount++;
+                    } else {
+                        seenSignatures.add(signature);
+                        transactionsToImport.push({
+                            date: dateStr,
+                            type,
+                            category,
+                            amount,
+                            description
+                        });
+                    }
                 }
             });
 
@@ -455,7 +467,11 @@ const AdminDashboard = () => {
                 await createTransaction(t);
             }
             
-            showToast(`${transactionsToImport.length} transaksi berhasil diimpor!`);
+            let message = `${transactionsToImport.length} data baru berhasil diimpor!`;
+            if (skippedCount > 0) {
+                message += ` (${skippedCount} data ganda dilewati)`;
+            }
+            showToast(message);
             
             const data = await fetchTransactions();
             setTransactions(Array.isArray(data) ? data : []);
