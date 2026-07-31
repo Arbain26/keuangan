@@ -670,7 +670,7 @@ const AdminDashboard = () => {
                                 {activeTab === 'transactions' && (
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                         {/* Input Form */}
-                                        <div className="lg:col-span-1 space-y-6">
+                                        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit">
                                             <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
                                                 <div className="flex items-center justify-between gap-2 mb-6">
                                                     <h3 className="text-lg font-bold text-white">{editingId ? 'Edit Transaksi' : 'Transaksi Baru'}</h3>
@@ -792,8 +792,8 @@ const AdminDashboard = () => {
 
                                         {/* Transaction List */}
                                         <div className="lg:col-span-2">
-                                            <div className="bg-[#161b22] border border-[#30363d] rounded-xl shadow-sm overflow-hidden">
-                                                <div className="p-5 border-b border-[#30363d] flex flex-col md:flex-row justify-between items-center gap-4">
+                                            <div className="bg-[#161b22] border border-[#30363d] rounded-xl shadow-sm overflow-hidden flex flex-col lg:h-[calc(100vh-230px)]">
+                                                <div className="p-5 border-b border-[#30363d] flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
                                                     <h3 className="font-bold text-white">Riwayat Transaksi</h3>
                                                     <div className="relative w-full md:w-64">
                                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8b949e]" />
@@ -806,9 +806,9 @@ const AdminDashboard = () => {
                                                         />
                                                     </div>
                                                 </div>
-                                                <div className="hidden md:block overflow-x-auto">
+                                                <div className="hidden md:block overflow-x-auto flex-1 lg:h-[calc(100vh-310px)] lg:overflow-y-auto">
                                                     <table className="w-full text-left text-sm text-[#8b949e]">
-                                                        <thead className="bg-[#0d1117] text-[#8b949e] font-semibold border-b border-[#30363d]">
+                                                        <thead className="bg-[#0d1117] text-[#8b949e] font-semibold border-b border-[#30363d] sticky top-0 z-10">
                                                             <tr>
                                                                 <th className="px-6 py-4 w-1/4">Tanggal</th>
                                                                 <th className="px-6 py-4 w-1/4">Kategori</th>
