@@ -786,7 +786,7 @@ const AdminDashboard = () => {
                                             }[activeTab]}
                                         </p>
                                     </div>
-                                    {activeTab === 'reports' && (
+                                    {(activeTab === 'reports' || activeTab === 'transactions') && (
                                         <button
                                             onClick={exportToExcel}
                                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-600/20"
