@@ -329,8 +329,8 @@ const AdminDashboard = () => {
             {
                 label: 'Arus Kas Bersih',
                 data: chartNetFlows.length > 0 ? chartNetFlows : [0],
-                borderColor: '#a3e635', // lime-400
-                backgroundColor: 'rgba(163, 230, 53, 0.1)',
+                borderColor: '#3b82f6', // blue-500
+                backgroundColor: 'rgba(59, 130, 246, 0.06)',
                 tension: 0.4,
                 fill: true,
                 pointRadius: 4,
@@ -350,6 +350,38 @@ const AdminDashboard = () => {
 
     const doughnutLabels = Object.keys(expenseByCategory);
     const doughnutData = Object.values(expenseByCategory);
+
+    // Sort categories by amount descending
+    const sortedCategories = Object.entries(expenseByCategory)
+        .sort((a, b) => b[1] - a[1]);
+
+    const totalExpenseAmount = sortedCategories.reduce((acc, curr) => acc + curr[1], 0);
+
+    const topCategories = [];
+    let otherSum = 0;
+    
+    sortedCategories.forEach(([cat, amount], idx) => {
+        if (idx < 4) {
+            topCategories.push({ category: cat, amount });
+        } else {
+            otherSum += amount;
+        }
+    });
+
+    if (otherSum > 0) {
+        topCategories.push({ category: 'lainnya', amount: otherSum });
+    }
+
+    const colorPalette = [
+        '#a3e635', // Lime-400
+        '#3b82f6', // Blue-500
+        '#f59e0b', // Amber-500
+        '#8b5cf6', // Purple-500
+        '#ec4899', // Pink-500
+        '#ef4444', // Red-500
+        '#06b6d4', // Cyan-500
+        '#6b7280', // Gray-500
+    ];
 
     const categoryChartData = {
         labels: doughnutLabels.length > 0 ? doughnutLabels : ['Tidak Ada Pengeluaran'],
@@ -379,12 +411,7 @@ const AdminDashboard = () => {
         maintainAspectRatio: false,
         plugins: {
             legend: {
-                position: 'bottom',
-                labels: {
-                    boxWidth: 10,
-                    color: '#8b949e',
-                    font: { size: 10 }
-                }
+                display: false
             },
             tooltip: {
                 backgroundColor: '#0d1117',
@@ -460,8 +487,8 @@ const AdminDashboard = () => {
                 <button
                     key={period.id}
                     onClick={() => setActivePeriod(period.id)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all border ${activePeriod === period.id
-                        ? 'bg-lime-400 text-black border-lime-400 shadow-sm'
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all border ${activePeriod === period.id
+                        ? 'bg-lime-400/10 text-lime-400 border-lime-400/40 shadow-lg shadow-lime-400/5'
                         : 'bg-[#161b22] text-[#8b949e] border-[#30363d] hover:border-[#8b949e] hover:text-[#c9d1d9]'
                         }`}
                 >
@@ -602,47 +629,47 @@ const AdminDashboard = () => {
                                         <FilterButtons />
                                         {/* Stats Cards */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            {/* Income */}
-                                            <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pemasukan</p>
-                                                        <h3 className="text-2xl font-bold text-white">{formatCurrency(totalIncome)}</h3>
-                                                    </div>
-                                                    <div className="p-2 bg-lime-400/10 rounded-lg">
-                                                        <TrendingUp className="w-5 h-5 text-lime-400" />
-                                                    </div>
-                                                </div>
-                                            </div>
+                                             {/* Income */}
+                                             <div className="bg-gradient-to-br from-[#0e1f17] to-[#161b22] border border-emerald-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                 <div className="flex items-start justify-between">
+                                                     <div>
+                                                         <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pemasukan</p>
+                                                         <h3 className="text-2xl font-bold text-white">{formatCurrency(totalIncome)}</h3>
+                                                     </div>
+                                                     <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                                         <TrendingUp className="w-5 h-5 text-emerald-400" />
+                                                     </div>
+                                                 </div>
+                                             </div>
 
-                                            {/* Expense */}
-                                            <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pengeluaran</p>
-                                                        <h3 className="text-2xl font-bold text-white">{formatCurrency(totalExpense)}</h3>
-                                                    </div>
-                                                    <div className="p-2 bg-rose-500/10 rounded-lg">
-                                                        <TrendingDown className="w-5 h-5 text-rose-500" />
-                                                    </div>
-                                                </div>
-                                            </div>
+                                             {/* Expense */}
+                                             <div className="bg-gradient-to-br from-[#2a1419] to-[#161b22] border border-rose-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                 <div className="flex items-start justify-between">
+                                                     <div>
+                                                         <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pengeluaran</p>
+                                                         <h3 className="text-2xl font-bold text-white">{formatCurrency(totalExpense)}</h3>
+                                                     </div>
+                                                     <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                                                         <TrendingDown className="w-5 h-5 text-rose-400" />
+                                                     </div>
+                                                 </div>
+                                             </div>
 
-                                            {/* Balance */}
-                                            <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
-                                                <div className="flex items-start justify-between">
-                                                    <div>
-                                                        <p className="text-sm font-medium text-[#8b949e] mb-1">Saldo Bersih</p>
-                                                        <h3 className="text-2xl font-bold text-white">{formatCurrency(balance)}</h3>
-                                                    </div>
-                                                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                                                        <Wallet className="w-5 h-5 text-blue-500" />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                             {/* Balance */}
+                                             <div className="bg-gradient-to-br from-[#0e1b2f] to-[#161b22] border border-blue-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                 <div className="flex items-start justify-between">
+                                                     <div>
+                                                         <p className="text-sm font-medium text-[#8b949e] mb-1">Saldo Bersih</p>
+                                                         <h3 className="text-2xl font-bold text-white">{formatCurrency(balance)}</h3>
+                                                     </div>
+                                                     <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                                         <Wallet className="w-5 h-5 text-blue-400" />
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         </div>
 
-                                        {/* Charts Grid */}
+                                         {/* Charts Grid */}
                                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                              {/* Line Chart */}
                                              <div className="lg:col-span-2 bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm">
@@ -659,13 +686,35 @@ const AdminDashboard = () => {
                                                  <div className="flex items-center justify-between mb-4">
                                                      <h3 className="text-lg font-bold text-white">Distribusi Pengeluaran</h3>
                                                  </div>
-                                                 <div className="h-64 flex items-center justify-center">
+                                                 <div className="h-44 flex items-center justify-center">
                                                      <Doughnut options={categoryChartOptions} data={categoryChartData} />
                                                  </div>
+                                                 {/* Custom Legend */}
+                                                 <div className="mt-4 space-y-2 border-t border-[#30363d] pt-4 shrink-0">
+                                                     {topCategories.length === 0 ? (
+                                                         <p className="text-xs text-[#8b949e] text-center">Belum ada data pengeluaran</p>
+                                                     ) : (
+                                                         topCategories.map((item, idx) => {
+                                                             const percentage = totalExpenseAmount > 0 ? ((item.amount / totalExpenseAmount) * 100).toFixed(0) : 0;
+                                                             return (
+                                                                 <div key={item.category} className="flex items-center justify-between text-xs text-[#c9d1d9]">
+                                                                     <div className="flex items-center gap-2">
+                                                                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorPalette[idx % colorPalette.length] }} />
+                                                                         <span className="capitalize truncate max-w-[120px] font-medium">{item.category}</span>
+                                                                     </div>
+                                                                     <div className="flex items-center gap-3">
+                                                                         <span className="text-[#8b949e] font-medium">{formatCurrency(item.amount)}</span>
+                                                                         <span className="font-bold text-white w-8 text-right">{percentage}%</span>
+                                                                     </div>
+                                                                 </div>
+                                                             );
+                                                         })
+                                                     )}
+                                                 </div>
                                              </div>
-                                         </div>
-                                    </div>
-                                )}
+                                          </div>
+                                      </div>
+                                 )}
 
                                 {activeTab === 'transactions' && (
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
