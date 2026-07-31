@@ -161,7 +161,7 @@ const PublicDashboard = () => {
     const expenseByCategory = {};
     filteredTransactions.forEach(t => {
         if (t.type === 'pengeluaran') {
-            const category = t.category || 'Lainnya';
+            const category = (t.category || 'Lainnya').toLowerCase();
             expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
         }
     });
@@ -668,7 +668,7 @@ const PublicDashboard = () => {
                                                 {new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                             </td>
                                             <td className="px-8 py-4">
-                                                <div className="text-sm font-medium text-gray-900">{t.category}</div>
+                                                <div className="text-sm font-medium text-gray-900">{t.category?.toLowerCase()}</div>
                                                 <div className="text-xs text-gray-400">{t.description}</div>
                                             </td>
                                             <td className={`px-8 py-4 whitespace-nowrap text-right text-sm font-bold ${t.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>

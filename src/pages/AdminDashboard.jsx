@@ -343,7 +343,7 @@ const AdminDashboard = () => {
     const expenseByCategory = {};
     filteredTransactions.forEach(t => {
         if (t.type === 'pengeluaran') {
-            const category = t.category || 'Lainnya';
+            const category = (t.category || 'Lainnya').toLowerCase();
             expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
         }
     });
@@ -831,7 +831,7 @@ const AdminDashboard = () => {
                                                                         <td className="px-6 py-4">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-lime-400' : 'bg-rose-500'}`}></span>
-                                                                                <span className="text-[#c9d1d9] font-medium">{t.category}</span>
+                                                                                <span className="text-[#c9d1d9] font-medium">{t.category?.toLowerCase()}</span>
                                                                             </div>
                                                                             {t.description && <div className="text-xs text-[#8b949e] mt-1 truncate max-w-[150px]">{t.description}</div>}
                                                                         </td>
@@ -869,7 +869,7 @@ const AdminDashboard = () => {
                                                                         <p className="text-xs text-[#8b949e]">{formatDate(t.date)} {t.date ? new Date(t.date).getFullYear() : ''}</p>
                                                                         <div className="flex items-center gap-2 mt-1">
                                                                             <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-lime-400' : 'bg-rose-500'}`}></span>
-                                                                            <span className="text-[#c9d1d9] font-bold">{t.category}</span>
+                                                                            <span className="text-[#c9d1d9] font-bold">{t.category?.toLowerCase()}</span>
                                                                         </div>
                                                                     </div>
                                                                     <span className={`font-bold ${t.type === 'pemasukan' ? 'text-lime-400' : 'text-rose-400'}`}>
@@ -940,7 +940,7 @@ const AdminDashboard = () => {
                                                                             {t.type}
                                                                         </span>
                                                                     </td>
-                                                                    <td className="px-6 py-3 text-[#c9d1d9]">{t.category}</td>
+                                                                    <td className="px-6 py-3 text-[#c9d1d9]">{t.category?.toLowerCase()}</td>
                                                                     <td className="px-6 py-3 truncate max-w-xs">{t.description || '-'}</td>
                                                                     <td className={`px-6 py-3 text-right font-medium ${t.type === 'pemasukan' ? 'text-lime-400' : 'text-[#c9d1d9]'}`}>
                                                                         {formatCurrency(t.amount)}
