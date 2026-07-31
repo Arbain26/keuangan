@@ -2,9 +2,15 @@ import { supabase } from './supabaseClient';
 
 export const fetchTransactions = async () => {
     try {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        
+        if (!userId) return []; // Jangan fetch jika belum login
+
         const { data, error } = await supabase
             .from('transactions')
             .select('*')
+            .eq('user_id', userId) // Filter hanya milik user ini
             .order('date', { ascending: false });
 
         if (error) throw error;
@@ -17,9 +23,19 @@ export const fetchTransactions = async () => {
 
 export const createTransaction = async (transaction) => {
     try {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        
+        if (!userId) throw new Error("User not authenticated");
+
+        const transactionWithUser = {
+            ...transaction,
+            user_id: userId // Otomatis masukkan ID user
+        };
+
         const { data, error } = await supabase
             .from('transactions')
-            .insert([transaction])
+            .insert([transactionWithUser])
             .select();
 
         if (error) throw error;
