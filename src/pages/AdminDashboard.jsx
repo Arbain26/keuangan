@@ -34,15 +34,15 @@ ChartJS.register(
 );
 
 const CATEGORIES = [
-    { id: 'Makanan & Minuman', label: 'Makanan & Minuman', icon: '🍔' },
-    { id: 'Transportasi', label: 'Transportasi', icon: '🚗' },
-    { id: 'Belanja', label: 'Belanja', icon: '🛍️' },
-    { id: 'Hiburan', label: 'Hiburan/Rekreasi', icon: '🎬' },
-    { id: 'Utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },
-    { id: 'Kesehatan', label: 'Kesehatan', icon: '🏥' },
-    { id: 'Gaji', label: 'Gaji/Pendapatan', icon: '💵' },
-    { id: 'Investasi', label: 'Investasi', icon: '📈' },
-    { id: 'Lainnya', label: 'Lainnya (Kustom)', icon: '📝' }
+    { id: 'makanan & minuman', label: 'Makanan & Minuman', icon: '🍔' },
+    { id: 'transportasi', label: 'Transportasi', icon: '🚗' },
+    { id: 'belanja', label: 'Belanja', icon: '🛍️' },
+    { id: 'hiburan', label: 'Hiburan/Rekreasi', icon: '🎬' },
+    { id: 'utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },
+    { id: 'kesehatan', label: 'Kesehatan', icon: '🏥' },
+    { id: 'gaji', label: 'Gaji/Pendapatan', icon: '💵' },
+    { id: 'investasi', label: 'Investasi', icon: '📈' },
+    { id: 'lainnya', label: 'Lainnya (Kustom)', icon: '📝' }
 ];
 
 const AdminDashboard = () => {
@@ -127,12 +127,18 @@ const AdminDashboard = () => {
         if (!formData.amount || !formData.date || !formData.category) return;
         setIsSubmitting(true);
 
+        const dataToSubmit = {
+            ...formData,
+            category: formData.category.trim().toLowerCase(),
+            description: formData.description ? formData.description.trim().toLowerCase() : ''
+        };
+
         try {
             if (editingId) {
-                await updateTransaction(editingId, formData);
+                await updateTransaction(editingId, dataToSubmit);
                 showToast('Transaksi berhasil diperbarui!');
             } else {
-                await createTransaction(formData);
+                await createTransaction(dataToSubmit);
                 showToast('Transaksi berhasil ditambahkan!');
             }
 
@@ -170,7 +176,7 @@ const AdminDashboard = () => {
             description: transaction.description || '',
             date: transaction.date || new Date().toISOString().split('T')[0]
         });
-        const isStd = CATEGORIES.some(cat => cat.id === transaction.category);
+        const isStd = CATEGORIES.some(cat => cat.id === (transaction.category || '').toLowerCase());
         setIsCustomCategory(!isStd && transaction.category !== '');
         window.scrollTo(0, 0);
     };
