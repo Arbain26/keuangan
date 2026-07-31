@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import PublicDashboard from './pages/PublicDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
+import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { supabase } from './lib/supabaseClient';
@@ -37,6 +38,7 @@ function App() {
           <Routes>
             <Route path="/" element={<PublicDashboard />} />
             <Route path="/login" element={<AdminLogin />} />
+            <Route path="/register" element={<Register />} />
             <Route
               path="/admin"
               element={
