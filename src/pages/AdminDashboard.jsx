@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
@@ -63,6 +63,7 @@ const AdminDashboard = () => {
     });
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const fileInputRef = useRef(null);
 
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
 
@@ -406,6 +407,64 @@ const AdminDashboard = () => {
         } catch (error) {
             console.error('Error exporting to excel:', error);
             showToast('Gagal mengekspor laporan.', 'error');
+        }
+    };
+
+    const handleUploadExcel = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        setIsSubmitting(true);
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+            const worksheet = workbook.worksheets[0]; // Get first sheet
+            
+            const transactionsToImport = [];
+            worksheet.eachRow((row, rowNumber) => {
+                if (rowNumber === 1) return; // Skip header
+                
+                const dateVal = row.getCell(1).value;
+                let dateStr = new Date().toISOString().split('T')[0];
+                if (dateVal instanceof Date) {
+                   dateStr = dateVal.toISOString().split('T')[0];
+                } else if (typeof dateVal === 'string') {
+                   const parsed = new Date(dateVal);
+                   if (!isNaN(parsed)) dateStr = parsed.toISOString().split('T')[0];
+                }
+
+                const typeStr = (row.getCell(2).value || '').toString().toLowerCase();
+                const type = typeStr.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
+                const category = (row.getCell(3).value || 'lainnya').toString().toLowerCase();
+                const amount = Number(row.getCell(4).value) || 0;
+                const description = (row.getCell(5).value || '').toString();
+                
+                if (amount > 0) {
+                    transactionsToImport.push({
+                        date: dateStr,
+                        type,
+                        category,
+                        amount,
+                        description
+                    });
+                }
+            });
+
+            for (const t of transactionsToImport) {
+                await createTransaction(t);
+            }
+            
+            showToast(`${transactionsToImport.length} transaksi berhasil diimpor!`);
+            
+            const data = await fetchTransactions();
+            setTransactions(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error("Error importing excel", error);
+            showToast('Gagal membaca file Excel.', 'error');
+        } finally {
+            setIsSubmitting(false);
+            e.target.value = null; // Reset input
         }
     };
 
@@ -786,7 +845,7 @@ const AdminDashboard = () => {
                                             }[activeTab]}
                                         </p>
                                     </div>
-                                    {(activeTab === 'reports' || activeTab === 'transactions') && (
+                                    {activeTab === 'reports' && (
                                         <button
                                             onClick={exportToExcel}
                                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-600/20"
@@ -794,6 +853,25 @@ const AdminDashboard = () => {
                                             <Download className="w-4 h-4" />
                                             Download Excel
                                         </button>
+                                    )}
+                                    {activeTab === 'transactions' && (
+                                        <div>
+                                            <input 
+                                                type="file" 
+                                                accept=".xlsx, .xls" 
+                                                ref={fileInputRef} 
+                                                onChange={handleUploadExcel} 
+                                                hidden 
+                                            />
+                                            <button
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={isSubmitting}
+                                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                                {isSubmitting ? 'Memproses...' : 'Upload Excel'}
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                                 <AnimatePresence mode="wait">

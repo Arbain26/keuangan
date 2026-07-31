@@ -151,7 +151,7 @@ const PublicDashboard = () => {
         }
         return true;
     });
- 
+
     // Total stats for the public dashboard (all-time totals)
     const publicIncome = transactions.filter(t => t.type === 'pemasukan').reduce((acc, t) => acc + Number(t.amount), 0);
     const publicExpense = transactions.filter(t => t.type === 'pengeluaran').reduce((acc, t) => acc + Number(t.amount), 0);
@@ -260,7 +260,7 @@ const PublicDashboard = () => {
                                 className="flex items-center gap-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-2 rounded-full transition shadow-lg shadow-gray-200"
                             >
                                 <LogIn className="w-4 h-4" />
-                                Admin
+                                Login
                             </Link>
                         </div>
                     </div>
@@ -491,158 +491,158 @@ const PublicDashboard = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
- 
-                         {/* WARNING BANNERS */}
-                         {(weeklyHealth.status !== 'healthy' && weeklyHealth.status !== 'neutral') && (
-                             <div className={`sm:col-span-2 lg:col-span-4 p-4 rounded-xl flex items-center gap-3 ${weeklyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
-                                 <AlertTriangle className="w-6 h-6 shrink-0" />
-                                 <div>
-                                     <p className="font-bold">Peringatan Keuangan Mingguan:</p>
-                                     <p className="text-sm">{weeklyHealth.message}</p>
-                                 </div>
-                             </div>
-                         )}
-                         {(monthlyHealth.status !== 'healthy' && monthlyHealth.status !== 'neutral') && (
-                             <div className={`sm:col-span-2 lg:col-span-4 p-4 rounded-xl flex items-center gap-3 ${monthlyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
-                                 <AlertTriangle className="w-6 h-6 shrink-0" />
-                                 <div>
-                                     <p className="font-bold">Peringatan Keuangan Bulanan:</p>
-                                     <p className="text-sm">{monthlyHealth.message}</p>
-                                 </div>
-                             </div>
-                         )}
- 
-                         {/* Card 0: Saldo Bersih */}
-                         <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-8 rounded-2xl shadow-md hover:shadow-lg transition relative overflow-hidden flex flex-col justify-between min-h-[220px]">
-                             <div className="absolute -right-6 -bottom-6 opacity-10">
-                                 <PiggyBank className="w-32 h-32 text-white" />
-                             </div>
-                             <div>
-                                 <p className="text-xs font-semibold text-blue-200 uppercase tracking-widest mb-1">Total Saldo Bersih</p>
-                                 <h3 className="text-2xl md:text-3xl font-black tracking-tight mt-1 truncate">
-                                     {loading ? '...' : formatCurrency(publicBalance)}
-                                 </h3>
-                             </div>
-                             <div className="space-y-1.5 border-t border-white/20 pt-3 mt-4">
-                                 <div className="flex justify-between text-xs text-blue-100">
-                                     <span>Pemasukan:</span>
-                                     <span className="font-bold text-green-300">{loading ? '...' : formatCurrency(publicIncome)}</span>
-                                 </div>
-                                 <div className="flex justify-between text-xs text-blue-100">
-                                     <span>Pengeluaran:</span>
-                                     <span className="font-bold text-red-300">{loading ? '...' : formatCurrency(publicExpense)}</span>
-                                 </div>
-                             </div>
-                         </div>
- 
-                         {/* Card 1: Weekly */}
-                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
-                             <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Mingguan</p>
- 
-                             <div className="space-y-4">
-                                 <div>
-                                     <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
-                                     <h3 className="text-xl font-bold text-gray-900">
-                                         {loading ? '...' : formatCurrency(stats.weeklyIncome)}
-                                     </h3>
-                                 </div>
-                                 <div className="border-t pt-2">
-                                     <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
-                                     <h3 className="text-xl font-bold text-gray-900">
-                                         {loading ? '...' : formatCurrency(stats.weeklyExpense)}
-                                     </h3>
-                                 </div>
-                             </div>
-                             <div className="mt-4 text-gray-400 text-xs">
-                                 7 hari terakhir
-                             </div>
-                         </div>
- 
-                         {/* Card 2: Monthly */}
-                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
-                             <div className="absolute top-0 right-0 p-4 opacity-5">
-                                 <BarChart3 className="w-24 h-24" />
-                             </div>
-                             <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Bulanan</p>
- 
-                             <div className="space-y-4">
-                                 <div>
-                                     <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
-                                     <h3 className="text-2xl font-bold text-green-600">
-                                         {loading ? '...' : formatCurrency(stats.monthlyIncome)}
-                                     </h3>
-                                 </div>
-                                 <div className="border-t pt-2">
-                                     <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
-                                     <h3 className="text-2xl font-bold text-red-600">
-                                         {loading ? '...' : formatCurrency(stats.monthlyExpense)}
-                                     </h3>
-                                 </div>
-                             </div>
-                             <div className="mt-4 text-gray-400 text-xs">
-                                 {activePeriod === 'month' ? `Bulan ${['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][selectedMonth]} ${selectedYear}` : 'Bulan ini'}
-                             </div>
-                         </div>
- 
-                         {/* Card 3: Yearly */}
-                         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
-                             <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Tahunan</p>
- 
-                             <div className="space-y-4">
-                                 <div>
-                                     <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
-                                     <h3 className="text-xl font-bold text-gray-900">
-                                         {loading ? '...' : formatCurrency(stats.yearlyIncome)}
-                                     </h3>
-                                 </div>
-                                 <div className="border-t pt-2">
-                                     <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
-                                     <h3 className="text-xl font-bold text-gray-900">
-                                         {loading ? '...' : formatCurrency(stats.yearlyExpense)}
-                                     </h3>
-                                 </div>
-                             </div>
-                             <div className="mt-4 text-gray-400 text-xs">
-                                 {activePeriod === 'year' ? `Tahun ${selectedYear}` : 'Tahun berjalan'}
-                             </div>
-                         </div>
- 
-                     </div>
- 
-                     {/* Chart Section Grid */}
-                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                         {/* Bar Chart (Income vs Expense) */}
-                         <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
-                             <div className="flex justify-between items-end mb-8">
-                                 <div>
-                                     <h3 className="text-xl font-bold text-gray-900">Grafik Arus Kas</h3>
-                                     <p className="text-gray-500 text-sm mt-1">Perbandingan Pemasukan & Pengeluaran Bulanan</p>
-                                 </div>
-                             </div>
-                             <div className="h-80 w-full">
-                                 {loading ? (
-                                     <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-xl">Memuat Grafik...</div>
-                                 ) : (
-                                     <Bar options={chartOptions} data={chartData} />
-                                 )}
-                             </div>
-                         </div>
- 
-                         {/* Doughnut Chart (Expense Category Breakdown) */}
-                         <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
-                             <div className="mb-8">
-                                 <h3 className="text-xl font-bold text-gray-900">Distribusi Pengeluaran</h3>
-                                 <p className="text-gray-500 text-sm mt-1">Berdasarkan kategori pengeluaran</p>
-                             </div>
-                             <div className="h-64 w-full flex items-center justify-center">
-                                 {loading ? (
-                                     <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-xl">Memuat Grafik...</div>
-                                 ) : (
-                                     <Doughnut options={categoryChartOptions} data={categoryChartData} />
-                                 )}
-                             </div>
-                         </div>
-                     </div>
+
+                        {/* WARNING BANNERS */}
+                        {(weeklyHealth.status !== 'healthy' && weeklyHealth.status !== 'neutral') && (
+                            <div className={`sm:col-span-2 lg:col-span-4 p-4 rounded-xl flex items-center gap-3 ${weeklyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
+                                <AlertTriangle className="w-6 h-6 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Peringatan Keuangan Mingguan:</p>
+                                    <p className="text-sm">{weeklyHealth.message}</p>
+                                </div>
+                            </div>
+                        )}
+                        {(monthlyHealth.status !== 'healthy' && monthlyHealth.status !== 'neutral') && (
+                            <div className={`sm:col-span-2 lg:col-span-4 p-4 rounded-xl flex items-center gap-3 ${monthlyHealth.status === 'critical' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-yellow-100 text-yellow-800 border border-yellow-200'}`}>
+                                <AlertTriangle className="w-6 h-6 shrink-0" />
+                                <div>
+                                    <p className="font-bold">Peringatan Keuangan Bulanan:</p>
+                                    <p className="text-sm">{monthlyHealth.message}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Card 0: Saldo Bersih */}
+                        <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white p-8 rounded-2xl shadow-md hover:shadow-lg transition relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+                            <div className="absolute -right-6 -bottom-6 opacity-10">
+                                <PiggyBank className="w-32 h-32 text-white" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-blue-200 uppercase tracking-widest mb-1">Total Saldo Bersih</p>
+                                <h3 className="text-2xl md:text-3xl font-black tracking-tight mt-1 truncate">
+                                    {loading ? '...' : formatCurrency(publicBalance)}
+                                </h3>
+                            </div>
+                            <div className="space-y-1.5 border-t border-white/20 pt-3 mt-4">
+                                <div className="flex justify-between text-xs text-blue-100">
+                                    <span>Pemasukan:</span>
+                                    <span className="font-bold text-green-300">{loading ? '...' : formatCurrency(publicIncome)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-blue-100">
+                                    <span>Pengeluaran:</span>
+                                    <span className="font-bold text-red-300">{loading ? '...' : formatCurrency(publicExpense)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Card 1: Weekly */}
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                            <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Mingguan</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        {loading ? '...' : formatCurrency(stats.weeklyIncome)}
+                                    </h3>
+                                </div>
+                                <div className="border-t pt-2">
+                                    <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        {loading ? '...' : formatCurrency(stats.weeklyExpense)}
+                                    </h3>
+                                </div>
+                            </div>
+                            <div className="mt-4 text-gray-400 text-xs">
+                                7 hari terakhir
+                            </div>
+                        </div>
+
+                        {/* Card 2: Monthly */}
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-5">
+                                <BarChart3 className="w-24 h-24" />
+                            </div>
+                            <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Bulanan</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
+                                    <h3 className="text-2xl font-bold text-green-600">
+                                        {loading ? '...' : formatCurrency(stats.monthlyIncome)}
+                                    </h3>
+                                </div>
+                                <div className="border-t pt-2">
+                                    <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
+                                    <h3 className="text-2xl font-bold text-red-600">
+                                        {loading ? '...' : formatCurrency(stats.monthlyExpense)}
+                                    </h3>
+                                </div>
+                            </div>
+                            <div className="mt-4 text-gray-400 text-xs">
+                                {activePeriod === 'month' ? `Bulan ${['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][selectedMonth]} ${selectedYear}` : 'Bulan ini'}
+                            </div>
+                        </div>
+
+                        {/* Card 3: Yearly */}
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                            <p className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">Tahunan</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xs text-green-600 font-bold uppercase">Pemasukan</p>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        {loading ? '...' : formatCurrency(stats.yearlyIncome)}
+                                    </h3>
+                                </div>
+                                <div className="border-t pt-2">
+                                    <p className="text-xs text-red-600 font-bold uppercase">Pengeluaran</p>
+                                    <h3 className="text-xl font-bold text-gray-900">
+                                        {loading ? '...' : formatCurrency(stats.yearlyExpense)}
+                                    </h3>
+                                </div>
+                            </div>
+                            <div className="mt-4 text-gray-400 text-xs">
+                                {activePeriod === 'year' ? `Tahun ${selectedYear}` : 'Tahun berjalan'}
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Chart Section Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Bar Chart (Income vs Expense) */}
+                        <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                            <div className="flex justify-between items-end mb-8">
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">Grafik Arus Kas</h3>
+                                    <p className="text-gray-500 text-sm mt-1">Perbandingan Pemasukan & Pengeluaran Bulanan</p>
+                                </div>
+                            </div>
+                            <div className="h-80 w-full">
+                                {loading ? (
+                                    <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-xl">Memuat Grafik...</div>
+                                ) : (
+                                    <Bar options={chartOptions} data={chartData} />
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Doughnut Chart (Expense Category Breakdown) */}
+                        <div className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100">
+                            <div className="mb-8">
+                                <h3 className="text-xl font-bold text-gray-900">Distribusi Pengeluaran</h3>
+                                <p className="text-gray-500 text-sm mt-1">Berdasarkan kategori pengeluaran</p>
+                            </div>
+                            <div className="h-64 w-full flex items-center justify-center">
+                                {loading ? (
+                                    <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-xl">Memuat Grafik...</div>
+                                ) : (
+                                    <Doughnut options={categoryChartOptions} data={categoryChartData} />
+                                )}
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Recent Transactions Section */}
                     <div className="mt-12 bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
