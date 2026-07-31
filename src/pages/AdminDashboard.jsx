@@ -630,39 +630,39 @@ const AdminDashboard = () => {
                                         {/* Stats Cards */}
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                              {/* Income */}
-                                             <div className="bg-gradient-to-br from-[#0e1f17] to-[#161b22] border border-emerald-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                             <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
                                                  <div className="flex items-start justify-between">
                                                      <div>
                                                          <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pemasukan</p>
                                                          <h3 className="text-2xl font-bold text-white">{formatCurrency(totalIncome)}</h3>
                                                      </div>
-                                                     <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                                     <div className="p-2 bg-emerald-500/10 rounded-lg">
                                                          <TrendingUp className="w-5 h-5 text-emerald-400" />
                                                      </div>
                                                  </div>
                                              </div>
 
                                              {/* Expense */}
-                                             <div className="bg-gradient-to-br from-[#2a1419] to-[#161b22] border border-rose-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                             <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
                                                  <div className="flex items-start justify-between">
                                                      <div>
                                                          <p className="text-sm font-medium text-[#8b949e] mb-1">Total Pengeluaran</p>
                                                          <h3 className="text-2xl font-bold text-white">{formatCurrency(totalExpense)}</h3>
                                                      </div>
-                                                     <div className="p-3 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                                                     <div className="p-2 bg-rose-500/10 rounded-lg">
                                                          <TrendingDown className="w-5 h-5 text-rose-400" />
                                                      </div>
                                                  </div>
                                              </div>
 
                                              {/* Balance */}
-                                             <div className="bg-gradient-to-br from-[#0e1b2f] to-[#161b22] border border-blue-500/20 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                             <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-6 shadow-sm relative overflow-hidden">
                                                  <div className="flex items-start justify-between">
                                                      <div>
                                                          <p className="text-sm font-medium text-[#8b949e] mb-1">Saldo Bersih</p>
                                                          <h3 className="text-2xl font-bold text-white">{formatCurrency(balance)}</h3>
                                                      </div>
-                                                     <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                                                     <div className="p-2 bg-blue-500/10 rounded-lg">
                                                          <Wallet className="w-5 h-5 text-blue-400" />
                                                      </div>
                                                  </div>
