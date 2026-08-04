@@ -27,6 +27,14 @@ ChartJS.register(
     ArcElement
 );
 
+const capitalizeText = (str) => {
+    if (!str) return '';
+    return str.split(' ').map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+};
+
 const PublicDashboard = () => {
     const [stats, setStats] = useState({
         weeklyExpense: 0,
@@ -668,8 +676,8 @@ const PublicDashboard = () => {
                                                 {new Date(t.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                             </td>
                                             <td className="px-8 py-4">
-                                                <div className="text-sm font-medium text-gray-900">{t.category?.toLowerCase()}</div>
-                                                <div className="text-xs text-gray-400">{t.description}</div>
+                                                <div className="text-sm font-medium text-gray-900">{capitalizeText(t.category)}</div>
+                                                {t.description && t.description !== '-' && <div className="text-xs text-gray-400">{t.description}</div>}
                                             </td>
                                             <td className={`px-8 py-4 whitespace-nowrap text-right text-sm font-bold ${t.type === 'pemasukan' ? 'text-green-600' : 'text-red-500'}`}>
                                                 {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}

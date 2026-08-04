@@ -33,6 +33,14 @@ ChartJS.register(
     ArcElement
 );
 
+const capitalizeText = (str) => {
+    if (!str) return '';
+    return str.split(' ').map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+};
+
 const formatNumberInput = (value) => {
     if (value === null || value === undefined) return '';
     // Strip everything except digits
@@ -1344,9 +1352,9 @@ const AdminDashboard = () => {
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                    <span className="text-gray-800 font-medium">{t.category?.toLowerCase()}</span>
+                                                                                    <span className="text-gray-800 font-medium">{capitalizeText(t.category)}</span>
                                                                                 </div>
-                                                                                {t.description && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{t.description}</div>}
+                                                                                {t.description && t.description !== '-' && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{t.description}</div>}
                                                                             </td>
                                                                             <td className="px-6 py-4">
                                                                                 <span className={`font-semibold ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -1392,14 +1400,14 @@ const AdminDashboard = () => {
                                                                             <p className="text-xs text-gray-400">{formatDate(t.date)} {t.date ? new Date(t.date).getFullYear() : ''}</p>
                                                                             <div className="flex items-center gap-2 mt-1">
                                                                                 <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                <span className="text-gray-800 font-bold">{t.category?.toLowerCase()}</span>
+                                                                                <span className="text-gray-800 font-bold">{capitalizeText(t.category)}</span>
                                                                             </div>
                                                                         </div>
                                                                         <span className={`font-bold ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                                             {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
                                                                         </span>
                                                                     </div>
-                                                                    {t.description && <p className="text-xs text-gray-500 italic">{t.description}</p>}
+                                                                    {t.description && t.description !== '-' && <p className="text-xs text-gray-500 italic">{t.description}</p>}
                                                                     <div className="flex justify-end gap-2 pt-1">
                                                                         <button onClick={() => handleEdit(t)} className="flex-1 py-2 bg-gray-50 text-gray-700 rounded flex items-center justify-center gap-2 text-xs font-medium border border-gray-200 hover:bg-gray-100">
                                                                             <Edit2 className="w-3.5 h-3.5" /> Edit
@@ -1464,8 +1472,8 @@ const AdminDashboard = () => {
                                                                             {t.type}
                                                                         </span>
                                                                     </td>
-                                                                    <td className="px-6 py-3 text-gray-800">{t.category?.toLowerCase()}</td>
-                                                                    <td className="px-6 py-3 truncate max-w-xs text-gray-600">{t.description || '-'}</td>
+                                                                    <td className="px-6 py-3 text-gray-800">{capitalizeText(t.category)}</td>
+                                                                    <td className="px-6 py-3 truncate max-w-xs text-gray-600">{(t.description && t.description !== '-') ? t.description : '-'}</td>
                                                                     <td className={`px-6 py-3 text-right font-medium ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-gray-800'}`}>
                                                                         {formatCurrency(t.amount)}
                                                                     </td>
