@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction } from '../lib/api';
+import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
 import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { Link } from 'react-router-dom';
@@ -32,6 +32,52 @@ ChartJS.register(
     LineElement,
     ArcElement
 );
+
+const formatNumberInput = (value) => {
+    if (value === null || value === undefined) return '';
+    // Strip everything except digits
+    const clean = value.toString().replace(/\D/g, '');
+    // Format with dot thousands separator
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};
+
+const getLocalDateString = (dateObj) => {
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseExcelDate = (val) => {
+    if (val instanceof Date) {
+        return getLocalDateString(val);
+    }
+    if (typeof val === 'string') {
+        const cleaned = val.trim();
+        // Check if matches YYYY-MM-DD or YYYY/MM/DD
+        const match = cleaned.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        if (match) {
+            const year = match[1];
+            const month = match[2].padStart(2, '0');
+            const day = match[3].padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        // Try other formats or fallback
+        const parsed = new Date(cleaned);
+        if (!isNaN(parsed.getTime())) {
+            return getLocalDateString(parsed);
+        }
+    }
+    // If it's a number (Excel serial date)
+    if (typeof val === 'number') {
+        // Excel base date is 1899-12-30
+        const excelEpoch = new Date(1899, 11, 30);
+        const dateVal = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
+        return getLocalDateString(dateVal);
+    }
+    return getLocalDateString(new Date());
+};
 
 const CATEGORIES = [
     { id: 'makanan & minuman', label: 'Makanan & Minuman', icon: '🍔' },
@@ -126,10 +172,18 @@ const AdminDashboard = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.amount || !formData.date || !formData.category) return;
+        
+        const amountCleaned = Number(formData.amount.toString().replace(/\D/g, '')) || 0;
+        if (amountCleaned <= 0) {
+            showToast('Jumlah nominal harus lebih besar dari 0.', 'error');
+            return;
+        }
+
         setIsSubmitting(true);
 
         const dataToSubmit = {
             ...formData,
+            amount: amountCleaned,
             category: formData.category.trim().toLowerCase(),
             description: formData.description ? formData.description.trim().toLowerCase() : ''
         };
@@ -173,7 +227,7 @@ const AdminDashboard = () => {
         setFormData({
             type: transaction.type,
             category: transaction.category || '',
-            amount: transaction.amount || 0,
+            amount: formatNumberInput(transaction.amount) || '',
             description: transaction.description || '',
             date: transaction.date || new Date().toISOString().split('T')[0]
         });
@@ -424,7 +478,14 @@ const AdminDashboard = () => {
             const transactionsToImport = [];
             // Gunakan Set untuk mendeteksi duplikat (baik dari DB maupun dalam file excel itu sendiri)
             const seenSignatures = new Set(
-                transactions.map(t => `${t.date}_${t.type}_${t.category}_${t.amount}_${t.description || ''}`)
+                transactions.map(t => {
+                    const tDate = t.date ? t.date.split('T')[0] : '';
+                    const tType = (t.type || '').toLowerCase();
+                    const tCategory = (t.category || '').trim().toLowerCase();
+                    const tAmount = Number(t.amount) || 0;
+                    const tDesc = (t.description || '').trim().toLowerCase();
+                    return `${tDate}_${tType}_${tCategory}_${tAmount}_${tDesc}`;
+                })
             );
             let skippedCount = 0;
 
@@ -432,22 +493,16 @@ const AdminDashboard = () => {
                 if (rowNumber === 1) return; // Skip header
                 
                 const dateVal = row.getCell(1).value;
-                let dateStr = new Date().toISOString().split('T')[0];
-                if (dateVal instanceof Date) {
-                   dateStr = dateVal.toISOString().split('T')[0];
-                } else if (typeof dateVal === 'string') {
-                   const parsed = new Date(dateVal);
-                   if (!isNaN(parsed)) dateStr = parsed.toISOString().split('T')[0];
-                }
+                const dateStr = parseExcelDate(dateVal);
 
                 const typeStr = (row.getCell(2).value || '').toString().toLowerCase();
                 const type = typeStr.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
-                const category = (row.getCell(3).value || 'lainnya').toString().toLowerCase();
+                const category = (row.getCell(3).value || 'lainnya').toString().trim().toLowerCase();
                 const amount = Number(row.getCell(4).value) || 0;
-                const description = (row.getCell(5).value || '').toString();
+                const description = (row.getCell(5).value || '').toString().trim();
                 
                 if (amount > 0) {
-                    const signature = `${dateStr}_${type}_${category}_${amount}_${description}`;
+                    const signature = `${dateStr}_${type}_${category}_${amount}_${description.toLowerCase()}`;
                     if (seenSignatures.has(signature)) {
                         skippedCount++;
                     } else {
@@ -481,6 +536,29 @@ const AdminDashboard = () => {
         } finally {
             setIsSubmitting(false);
             e.target.value = null; // Reset input
+        }
+    };
+
+    const handleDeleteAllTransactions = async () => {
+        if (confirm('PERINGATAN: Apakah Anda yakin ingin menghapus SEMUA data transaksi? Tindakan ini tidak dapat dibatalkan.')) {
+            if (confirm('Konfirmasi kedua: Apakah Anda benar-benar yakin ingin menghapus seluruh data transaksi?')) {
+                setIsSubmitting(true);
+                try {
+                    const success = await deleteAllTransactions();
+                    if (success) {
+                        showToast('Semua transaksi berhasil dihapus!');
+                        const data = await fetchTransactions();
+                        setTransactions(Array.isArray(data) ? data : []);
+                    } else {
+                        showToast('Gagal menghapus semua transaksi.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error in handleDeleteAllTransactions:', error);
+                    showToast('Terjadi kesalahan saat menghapus data.', 'error');
+                } finally {
+                    setIsSubmitting(false);
+                }
+            }
         }
     };
 
@@ -871,7 +949,7 @@ const AdminDashboard = () => {
                                         </button>
                                     )}
                                     {activeTab === 'transactions' && (
-                                        <div>
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <input 
                                                 type="file" 
                                                 accept=".xlsx, .xls" 
@@ -886,6 +964,14 @@ const AdminDashboard = () => {
                                             >
                                                 <Upload className="w-4 h-4" />
                                                 {isSubmitting ? 'Memproses...' : 'Upload Excel'}
+                                            </button>
+                                            <button
+                                                onClick={handleDeleteAllTransactions}
+                                                disabled={isSubmitting || transactions.length === 0}
+                                                className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white text-sm font-bold rounded-lg hover:bg-rose-700 transition shadow-lg shadow-rose-600/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                Hapus Semua Data
                                             </button>
                                         </div>
                                     )}
@@ -1053,10 +1139,10 @@ const AdminDashboard = () => {
                                                         <div className="relative">
                                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
                                                             <input
-                                                                type="number"
+                                                                type="text"
                                                                 placeholder="0"
                                                                 value={formData.amount}
-                                                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                                                onChange={(e) => setFormData({ ...formData, amount: formatNumberInput(e.target.value) })}
                                                                 className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg py-2.5 pl-10 pr-4 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition font-medium"
                                                                 required
                                                             />

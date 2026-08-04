@@ -76,3 +76,23 @@ export const updateTransaction = async (id, updates) => {
         return null;
     }
 };
+
+export const deleteAllTransactions = async () => {
+    try {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        
+        if (!userId) throw new Error("User not authenticated");
+
+        const { error } = await supabase
+            .from('transactions')
+            .delete()
+            .eq('user_id', userId);
+
+        if (error) throw error;
+        return true;
+    } catch (error) {
+        console.error('Error deleting all transactions:', error.message);
+        return false;
+    }
+};
