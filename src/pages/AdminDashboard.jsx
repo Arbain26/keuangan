@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera } from 'lucide-react';
 import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
+import { scanReceiptImage } from '../utils/receiptScanner';
 import { Link } from 'react-router-dom';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import ExcelJS from 'exceljs';
@@ -217,6 +218,9 @@ const AdminDashboard = () => {
     const [editingId, setEditingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const fileInputRef = useRef(null);
+    const receiptInputRef = useRef(null);
+    const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+    const [scanProgress, setScanProgress] = useState('');
 
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
 
@@ -228,10 +232,40 @@ const AdminDashboard = () => {
     });
     const [profileMessage, setProfileMessage] = useState('');
 
-    // Additional Premium states
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [toast, setToast] = useState(null);
     const [isCustomCategory, setIsCustomCategory] = useState(false);
+
+    const handleReceiptPhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setIsScanningReceipt(true);
+        setScanProgress('Membaca foto nota...');
+        try {
+            const scannedData = await scanReceiptImage(file, (msg) => setScanProgress(msg));
+            
+            setFormData(prev => ({
+                ...prev,
+                type: scannedData.type || 'pengeluaran',
+                amount: scannedData.amount ? formatNumberInput(scannedData.amount) : prev.amount,
+                date: scannedData.date || prev.date,
+                category: scannedData.category || prev.category,
+                description: scannedData.description || prev.description
+            }));
+
+            const isStd = CATEGORIES.some(cat => cat.id === (scannedData.category || '').toLowerCase());
+            setIsCustomCategory(!isStd && scannedData.category !== '');
+
+            showToast('Foto nota berhasil dipindai! Silakan periksa & simpan transaksi.');
+        } catch (error) {
+            console.error('Error scanning receipt:', error);
+            showToast('Gagal membaca foto nota. Silakan input manual.', 'error');
+        } finally {
+            setIsScanningReceipt(false);
+            e.target.value = null;
+        }
+    };
 
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
@@ -1242,10 +1276,37 @@ const AdminDashboard = () => {
                                              className="lg:col-span-1 space-y-6 lg:sticky lg:top-24 h-fit"
                                          >
                                             <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm shadow-gray-100">
-                                                <div className="flex items-center justify-between gap-2 mb-6">
+                                                <div className="flex items-center justify-between gap-2 mb-4">
                                                     <h3 className="text-lg font-bold text-gray-900">{editingId ? 'Edit Transaksi' : 'Transaksi Baru'}</h3>
                                                     {editingId && <button onClick={cancelEdit} className="text-xs text-rose-400 hover:text-rose-300 hover:underline">Batal Edit</button>}
                                                 </div>
+
+                                                <input
+                                                    type="file"
+                                                    ref={receiptInputRef}
+                                                    onChange={handleReceiptPhotoUpload}
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => receiptInputRef.current?.click()}
+                                                    disabled={isScanningReceipt}
+                                                    className="w-full mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm cursor-pointer disabled:opacity-50"
+                                                >
+                                                    {isScanningReceipt ? (
+                                                        <>
+                                                            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                                            <span>{scanProgress || 'Memindai Foto Nota...'}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Camera className="w-4 h-4 text-blue-600" />
+                                                            <span>Catat via Foto Struk / Nota</span>
+                                                        </>
+                                                    )}
+                                                </button>
 
                                                 <form onSubmit={handleSubmit} className="space-y-4">
                                                     <div className="grid grid-cols-2 gap-3 p-1 bg-gray-50 rounded-lg border border-gray-200">
