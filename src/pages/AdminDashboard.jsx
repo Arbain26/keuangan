@@ -188,6 +188,7 @@ const parseExcelDate = (val) => {
 const CATEGORIES = [
     { id: 'makanan & minuman', label: 'Makanan & Minuman', icon: '🍔' },
     { id: 'transportasi', label: 'Transportasi', icon: '🚗' },
+    { id: 'pendidikan', label: 'Pendidikan / Kuliah', icon: '🎓' },
     { id: 'belanja', label: 'Belanja', icon: '🛍️' },
     { id: 'hiburan', label: 'Hiburan/Rekreasi', icon: '🎬' },
     { id: 'utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },

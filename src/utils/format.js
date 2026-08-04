@@ -62,12 +62,18 @@ export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
         return 'makanan & minuman';
     }
     if (['transportasi', 'transport'].includes(c)) return 'transportasi';
+    if (['pendidikan', 'pendidikan / kuliah', 'kuliah', 'pendidikan/kuliah'].includes(c)) return 'pendidikan';
     if (['belanja'].includes(c)) return 'belanja';
     if (['hiburan', 'hiburan/rekreasi', 'rekreasi'].includes(c)) return 'hiburan';
     if (['utilitas', 'tagihan & utilitas', 'tagihan', 'utilitas & tagihan'].includes(c)) return 'utilitas';
     if (['kesehatan'].includes(c)) return 'kesehatan';
     if (['gaji', 'gaji/pendapatan', 'pendapatan', 'pemasukan'].includes(c)) return 'gaji';
     if (['investasi'].includes(c)) return 'investasi';
+
+    // Pendidikan / Kuliah keywords (high priority before hiburan/belanja)
+    if (['spp', 'berkas', 'rama tama', 'ramatama', 'kuliah', 'kampus', 'seminar', 'skripsi', 'turnitin', 'turniting', 'toga', 'pustaka', 'wisuda', 'selempang', 'ijazah', 'matakuliah', 'dosen', 'akademik', 'ukt'].some(k => c.includes(k))) {
+        return 'pendidikan';
+    }
 
     // Makanan & Minuman keywords
     if (['makan', 'minum', 'kopi', 'jajan', 'bukber', 'takjil', 'telur', 'nasi', 'ayam', 'warung', 'restoran', 'kafe', 'seporsi'].some(k => c.includes(k))) {
@@ -85,12 +91,12 @@ export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
     }
 
     // Hiburan keywords
-    if (['game', 'nonton', 'tiket', 'wisuda', 'acaraan', 'rama tama', 'foto', 'cukur'].some(k => c.includes(k))) {
+    if (['game', 'nonton', 'tiket', 'acaraan', 'foto', 'cukur'].some(k => c.includes(k))) {
         return 'hiburan';
     }
 
     // Belanja keywords
-    if (['sabun', 'kaos kaki', 'odol', 'minyak', 'farfum', 'parfum', 'baju', 'celana', 'sepatu', 'kertas', 'berkas', 'selempang'].some(k => c.includes(k))) {
+    if (['sabun', 'kaos kaki', 'odol', 'minyak', 'farfum', 'parfum', 'baju', 'celana', 'sepatu', 'kertas'].some(k => c.includes(k))) {
         return 'belanja';
     }
 
@@ -111,4 +117,5 @@ export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
 
     return c;
 };
+
 
