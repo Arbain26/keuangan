@@ -247,16 +247,17 @@ const PublicDashboard = () => {
             <nav className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16 items-center">
-                        <div className="flex items-center gap-2">
-                            <motion.div
-                                initial={{ rotate: -180, opacity: 0 }}
-                                animate={{ rotate: 0, opacity: 1 }}
-                                transition={{ duration: 0.8 }}
-                                className="bg-blue-600 p-1.5 rounded-lg">
-                                <TrendingUp className="w-5 h-5 text-white" />
-                            </motion.div>
+                        <div className="flex items-center gap-3">
+                            <motion.img
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ duration: 0.5 }}
+                                src="/logo.jpg"
+                                alt="My Finance Logo"
+                                className="w-9 h-9 rounded-lg object-cover shadow-sm"
+                            />
                             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
-                                FinTrack
+                                My Finance
                             </h1>
                         </div>
                         <div className="flex items-center gap-6">

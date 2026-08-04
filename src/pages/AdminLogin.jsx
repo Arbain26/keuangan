@@ -37,9 +37,7 @@ const AdminLogin = () => {
             <div className="w-full max-w-md relative z-10">
                 <div className="bg-white border border-gray-100 rounded-3xl p-8 md:p-10 shadow-xl shadow-gray-200/50">
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/20">
-                            <Lock className="w-8 h-8 text-white" />
-                        </div>
+                        <img src="/logo.jpg" alt="Logo" className="w-16 h-16 rounded-2xl mx-auto mb-6 shadow-lg shadow-blue-500/20 object-cover" />
                         <h2 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Admin Portal</h2>
                         <p className="text-gray-500 text-sm">Masuk untuk mengelola Dashboard Keuangan</p>
                     </div>

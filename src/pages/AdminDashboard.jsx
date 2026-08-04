@@ -983,11 +983,9 @@ const AdminDashboard = () => {
                         {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                            <Wallet className="w-5 h-5 text-white" />
-                        </div>
+                        <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm shadow-blue-500/20" />
                         <div>
-                            <h1 className="text-sm font-bold text-gray-900 leading-tight">Keuangan</h1>
+                            <h1 className="text-sm font-bold text-gray-900 leading-tight">My Finance</h1>
                         </div>
                     </div>
                 </div>
