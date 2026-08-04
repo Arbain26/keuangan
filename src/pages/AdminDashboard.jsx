@@ -49,9 +49,35 @@ const getLocalDateString = (dateObj) => {
     return `${year}-${month}-${day}`;
 };
 
+const getCellValue = (cell) => {
+    if (!cell) return '';
+    const val = cell.value;
+    if (val === null || val === undefined) return '';
+    
+    // If it is a formula
+    if (typeof val === 'object' && val.formula !== undefined && val.result !== undefined) {
+        return val.result;
+    }
+    
+    // If it is a hyperlink
+    if (typeof val === 'object' && val.text !== undefined && val.hyperlink !== undefined) {
+        return val.text;
+    }
+    
+    // If it is rich text
+    if (typeof val === 'object' && Array.isArray(val.richText)) {
+        return val.richText.map(t => t.text || '').join('');
+    }
+    
+    return val;
+};
+
 const parseExcelDate = (val) => {
     if (val instanceof Date) {
         return getLocalDateString(val);
+    }
+    if (val === null || val === undefined) {
+        return getLocalDateString(new Date());
     }
     if (typeof val === 'string') {
         const cleaned = val.trim();
@@ -61,6 +87,14 @@ const parseExcelDate = (val) => {
             const year = match[1];
             const month = match[2].padStart(2, '0');
             const day = match[3].padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        // Try DD-MM-YYYY or DD/MM/YYYY
+        const matchDDMM = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        if (matchDDMM) {
+            const day = matchDDMM[1].padStart(2, '0');
+            const month = matchDDMM[2].padStart(2, '0');
+            const year = matchDDMM[3];
             return `${year}-${month}-${day}`;
         }
         // Try other formats or fallback
@@ -489,17 +523,57 @@ const AdminDashboard = () => {
             );
             let skippedCount = 0;
 
+            // Indeks kolom bawaan (jika header tidak ditemukan)
+            let colIndices = {
+                date: 1,
+                type: 2,
+                category: 3,
+                amount: 4,
+                description: 5
+            };
+
             worksheet.eachRow((row, rowNumber) => {
-                if (rowNumber === 1) return; // Skip header
+                if (rowNumber === 1) {
+                    // Cari indeks kolom secara dinamis berdasarkan nama header
+                    row.eachCell((cell, colNumber) => {
+                        const headerText = (getCellValue(cell) || '').toString().toLowerCase().trim();
+                        if (headerText.includes('tanggal') || headerText.includes('date')) {
+                            colIndices.date = colNumber;
+                        } else if (headerText.includes('tipe') || headerText.includes('type')) {
+                            colIndices.type = colNumber;
+                        } else if (headerText.includes('kategori') || headerText.includes('category')) {
+                            colIndices.category = colNumber;
+                        } else if (headerText.includes('nominal') || headerText.includes('jumlah') || headerText.includes('amount')) {
+                            colIndices.amount = colNumber;
+                        } else if (headerText.includes('keterangan') || headerText.includes('deskripsi') || headerText.includes('description') || headerText.includes('catatan') || headerText.includes('note')) {
+                            colIndices.description = colNumber;
+                        }
+                    });
+                    return; // Lewati baris header
+                }
                 
-                const dateVal = row.getCell(1).value;
+                const dateVal = getCellValue(row.getCell(colIndices.date));
                 const dateStr = parseExcelDate(dateVal);
 
-                const typeStr = (row.getCell(2).value || '').toString().toLowerCase();
+                const typeVal = getCellValue(row.getCell(colIndices.type));
+                const typeStr = (typeVal || '').toString().toLowerCase();
                 const type = typeStr.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
-                const category = (row.getCell(3).value || 'lainnya').toString().trim().toLowerCase();
-                const amount = Number(row.getCell(4).value) || 0;
-                const description = (row.getCell(5).value || '').toString().trim();
+                
+                const categoryVal = getCellValue(row.getCell(colIndices.category));
+                const category = (categoryVal || 'lainnya').toString().trim().toLowerCase();
+                
+                const amountVal = getCellValue(row.getCell(colIndices.amount));
+                let amount = 0;
+                if (typeof amountVal === 'number') {
+                    amount = amountVal;
+                } else if (amountVal) {
+                    // Bersihkan pemformatan dari string (seperti Rp, titik, koma, spasi)
+                    const cleaned = amountVal.toString().replace(/\D/g, '');
+                    amount = Number(cleaned) || 0;
+                }
+                
+                const descriptionVal = getCellValue(row.getCell(colIndices.description));
+                const description = (descriptionVal || '').toString().trim();
                 
                 if (amount > 0) {
                     const signature = `${dateStr}_${type}_${category}_${amount}_${description.toLowerCase()}`;
