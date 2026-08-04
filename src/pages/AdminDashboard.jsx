@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
 import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard } from 'lucide-react';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import ExcelJS from 'exceljs';
@@ -290,7 +290,7 @@ const AdminDashboard = () => {
         const dataToSubmit = {
             ...formData,
             amount: amountCleaned,
-            category: formData.category.trim().toLowerCase(),
+            category: normalizeCategory(formData.category.trim(), formData.type),
             description: formData.description ? formData.description.trim().toLowerCase() : ''
         };
 
@@ -632,7 +632,7 @@ const AdminDashboard = () => {
                 const type = typeStr.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
                 
                 const categoryVal = getCellValue(row.getCell(colIndices.category));
-                const category = (categoryVal || 'lainnya').toString().trim().toLowerCase();
+                const category = normalizeCategory(categoryVal, type);
                 
                 const amountVal = getCellValue(row.getCell(colIndices.amount));
                 let amount = 0;
@@ -792,7 +792,7 @@ const AdminDashboard = () => {
     const expenseByCategory = {};
     filteredTransactions.forEach(t => {
         if (t.type === 'pengeluaran') {
-            const category = (t.category || 'Lainnya').toLowerCase();
+            const category = normalizeCategory(t.category, t.type);
             expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
         }
     });

@@ -49,3 +49,66 @@ export const formatDate = (dateString) => {
         return dateString;
     }
 };
+
+export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
+    if (!categoryInput || categoryInput.toString().trim() === '-' || categoryInput.toString().trim() === '') {
+        return type === 'pemasukan' ? 'gaji' : 'lainnya';
+    }
+
+    const c = categoryInput.toString().trim().toLowerCase();
+
+    // Standard category direct matches
+    if (['makanan & minuman', 'makanan dan minuman', 'makanan&minuman', 'makanan', 'minuman'].includes(c)) {
+        return 'makanan & minuman';
+    }
+    if (['transportasi', 'transport'].includes(c)) return 'transportasi';
+    if (['belanja'].includes(c)) return 'belanja';
+    if (['hiburan', 'hiburan/rekreasi', 'rekreasi'].includes(c)) return 'hiburan';
+    if (['utilitas', 'tagihan & utilitas', 'tagihan', 'utilitas & tagihan'].includes(c)) return 'utilitas';
+    if (['kesehatan'].includes(c)) return 'kesehatan';
+    if (['gaji', 'gaji/pendapatan', 'pendapatan', 'pemasukan'].includes(c)) return 'gaji';
+    if (['investasi'].includes(c)) return 'investasi';
+
+    // Makanan & Minuman keywords
+    if (['makan', 'minum', 'kopi', 'jajan', 'bukber', 'takjil', 'telur', 'nasi', 'ayam', 'warung', 'restoran', 'kafe', 'seporsi'].some(k => c.includes(k))) {
+        return 'makanan & minuman';
+    }
+
+    // Transportasi keywords
+    if (['bensin', 'parkir', 'tambal ban', 'bengkel', 'ganti oli', 'perbaikan', 'ojek', 'grab', 'gojek', 'servis', 'tol'].some(k => c.includes(k))) {
+        return 'transportasi';
+    }
+
+    // Utilitas keywords
+    if (['pulsa', 'paket data', 'internet', 'listrik', 'pln', 'pdam', 'wifi', 'air'].some(k => c.includes(k))) {
+        return 'utilitas';
+    }
+
+    // Hiburan keywords
+    if (['game', 'nonton', 'tiket', 'wisuda', 'acaraan', 'rama tama', 'foto', 'cukur'].some(k => c.includes(k))) {
+        return 'hiburan';
+    }
+
+    // Belanja keywords
+    if (['sabun', 'kaos kaki', 'odol', 'minyak', 'farfum', 'parfum', 'baju', 'celana', 'sepatu', 'kertas', 'berkas', 'selempang'].some(k => c.includes(k))) {
+        return 'belanja';
+    }
+
+    // Kesehatan keywords
+    if (['obat', 'dokter', 'klinik', 'rumahsakit', 'apotek'].some(k => c.includes(k))) {
+        return 'kesehatan';
+    }
+
+    // Gaji / Income keywords
+    if (type === 'pemasukan' || ['gaji', 'pemasukan', 'transfer', 'thr', 'cashback', 'bonus', 'uang kertas'].some(k => c.includes(k))) {
+        return 'gaji';
+    }
+
+    // Investasi keywords
+    if (['investasi', 'saham', 'reksadana', 'crypto', 'tabungan'].some(k => c.includes(k))) {
+        return 'investasi';
+    }
+
+    return c;
+};
+

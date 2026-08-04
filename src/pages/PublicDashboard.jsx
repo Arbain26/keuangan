@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchTransactions } from '../lib/api';
 import { calculateStats, parseSafeDate } from '../utils/calculations';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, normalizeCategory } from '../utils/format';
 import { Link } from 'react-router-dom';
 import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle, Quote, PieChart, PiggyBank, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -169,10 +169,11 @@ const PublicDashboard = () => {
     const expenseByCategory = {};
     filteredTransactions.forEach(t => {
         if (t.type === 'pengeluaran') {
-            const category = (t.category || 'Lainnya').toLowerCase();
+            const category = normalizeCategory(t.category, t.type);
             expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
         }
     });
+
 
     const doughnutLabels = Object.keys(expenseByCategory);
     const doughnutData = Object.values(expenseByCategory);
