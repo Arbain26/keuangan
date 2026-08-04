@@ -80,43 +80,107 @@ const getCellValue = (cell) => {
     return val;
 };
 
+const getUTCDateString = (dateObj) => {
+    if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+    const year = dateObj.getUTCFullYear();
+    const month = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const parseIndonesianDate = (str) => {
+    if (!str) return null;
+    const cleaned = str.toString().toLowerCase().trim()
+        .replace(/[\s\-,]+/g, ' '); // normalize spaces, hyphens, commas
+    
+    const monthsMap = {
+        jan: '01', januari: '01',
+        feb: '02', februari: '02',
+        mar: '03', maret: '03',
+        apr: '04', april: '04',
+        mei: '05',
+        jun: '06', juni: '06',
+        jul: '07', juli: '07',
+        agt: '08', agust: '08', agustus: '08',
+        sep: '09', september: '09',
+        okt: '10', oktober: '10',
+        nov: '11', november: '11',
+        des: '12', desember: '12'
+    };
+
+    const words = cleaned.split(' ');
+    if (words.length >= 3) {
+        const dayPart = words[0];
+        const monthPart = words[1];
+        let yearPart = words[2];
+
+        const dayNum = parseInt(dayPart, 10);
+        const monthNum = monthsMap[monthPart];
+        
+        if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31 && monthNum && yearPart) {
+            let year = yearPart;
+            if (year.length === 2) {
+                year = (Number(year) < 70 ? '20' : '19') + year;
+            }
+            if (year.length === 4) {
+                const day = String(dayNum).padStart(2, '0');
+                return `${year}-${monthNum}-${day}`;
+            }
+        }
+    }
+    return null;
+};
+
 const parseExcelDate = (val) => {
     if (val instanceof Date) {
-        return getLocalDateString(val);
+        return getUTCDateString(val);
     }
     if (val === null || val === undefined) {
-        return getLocalDateString(new Date());
+        return getLocalDateString(new Date()); // fallback to current local date
     }
     if (typeof val === 'string') {
         const cleaned = val.trim();
-        // Check if matches YYYY-MM-DD or YYYY/MM/DD
-        const match = cleaned.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+        
+        // Coba parsing format teks Indonesia (contoh: "4 Agustus 2026" atau "04-Agt-26")
+        const indoParsed = parseIndonesianDate(cleaned);
+        if (indoParsed) return indoParsed;
+
+        // Cocokkan YYYY-MM-DD atau YY-MM-DD atau YYYY/MM/DD
+        const match = cleaned.match(/^(\d{2,4})[-/](\d{1,2})[-/](\d{1,2})/);
         if (match) {
-            const year = match[1];
+            let year = match[1];
+            if (year.length === 2) {
+                year = (Number(year) < 70 ? '20' : '19') + year;
+            }
             const month = match[2].padStart(2, '0');
             const day = match[3].padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
-        // Try DD-MM-YYYY or DD/MM/YYYY
-        const matchDDMM = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+        
+        // Cocokkan DD-MM-YYYY atau DD/MM/YYYY atau DD/MM/YY
+        const matchDDMM = cleaned.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
         if (matchDDMM) {
             const day = matchDDMM[1].padStart(2, '0');
             const month = matchDDMM[2].padStart(2, '0');
-            const year = matchDDMM[3];
+            let year = matchDDMM[3];
+            if (year.length === 2) {
+                year = (Number(year) < 70 ? '20' : '19') + year;
+            }
             return `${year}-${month}-${day}`;
         }
-        // Try other formats or fallback
+        
+        // Fallback untuk format lain
         const parsed = new Date(cleaned);
         if (!isNaN(parsed.getTime())) {
             return getLocalDateString(parsed);
         }
     }
-    // If it's a number (Excel serial date)
+    // Jika berupa angka serial Excel
     if (typeof val === 'number') {
-        // Excel base date is 1899-12-30
-        const excelEpoch = new Date(1899, 11, 30);
+        // Epoch dasar Excel adalah 1899-12-30 (mengakomodasi bug kabisat 1900 di Excel)
+        const excelEpoch = new Date(Date.UTC(1899, 11, 30));
         const dateVal = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
-        return getLocalDateString(dateVal);
+        return getUTCDateString(dateVal);
     }
     return getLocalDateString(new Date());
 };
