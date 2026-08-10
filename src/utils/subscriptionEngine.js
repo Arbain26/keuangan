@@ -71,7 +71,7 @@ export const fetchUsageLimits = async () => {
 
 // 3. Get User Subscription Status & Expiration Check
 export const getUserSubscriptionStatus = async (userId) => {
-    if (!userId || !supabase) {
+    if (!userId) {
         return {
             plan_code: 'FREE',
             subscription_status: 'FREE',
@@ -81,13 +81,31 @@ export const getUserSubscriptionStatus = async (userId) => {
     }
 
     try {
-        const { data, error } = await supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('user_id', userId)
-            .maybeSingle();
+        let subData = null;
 
-        if (error || !data) {
+        if (supabase) {
+            const { data, error } = await supabase
+                .from('user_subscriptions')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (!error && data) {
+                subData = data;
+            }
+        }
+
+        // LocalStorage fallback if DB table not created yet or empty
+        if (!subData) {
+            const localSub = localStorage.getItem(`local_sub_${userId}`);
+            if (localSub) {
+                try {
+                    subData = JSON.parse(localSub);
+                } catch {}
+            }
+        }
+
+        if (!subData) {
             return {
                 plan_code: 'FREE',
                 subscription_status: 'FREE',
@@ -97,34 +115,38 @@ export const getUserSubscriptionStatus = async (userId) => {
         }
 
         // Unlimited Lifetime Check
-        if (data.plan_code === 'PREMIUM_LIFETIME') {
+        if (subData.plan_code === 'PREMIUM_LIFETIME') {
             return {
-                ...data,
+                ...subData,
                 subscription_status: 'ACTIVE',
                 subscription_end: null
             };
         }
 
         // Expiration Check for Fixed Duration Plans
-        if (data.subscription_end) {
-            const endDate = new Date(data.subscription_end);
+        if (subData.subscription_end) {
+            const endDate = new Date(subData.subscription_end);
             const now = new Date();
             if (endDate < now) {
-                // Mark subscription as EXPIRED in DB
-                await supabase
-                    .from('user_subscriptions')
-                    .update({ subscription_status: 'EXPIRED' })
-                    .eq('id', data.id);
-
-                return {
-                    ...data,
+                const expiredSub = {
+                    ...subData,
                     subscription_status: 'EXPIRED',
                     is_expired_reverted_to_free: true
                 };
+
+                if (supabase) {
+                    supabase
+                        .from('user_subscriptions')
+                        .update({ subscription_status: 'EXPIRED' })
+                        .eq('id', subData.id);
+                }
+                localStorage.setItem(`local_sub_${userId}`, JSON.stringify(expiredSub));
+
+                return expiredSub;
             }
         }
 
-        return data;
+        return subData;
     } catch (err) {
         console.error('Error getting user subscription status:', err);
         return {
@@ -343,25 +365,47 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
 };
 
 // 8. Process Order Payment Completion
-export const processOrderPayment = async (orderId) => {
-    if (!supabase) return { success: true };
-
+export const processOrderPayment = async (orderId, passedOrderObj) => {
     try {
-        const { data: order, error } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('order_id', orderId)
-            .maybeSingle();
+        let order = passedOrderObj;
 
-        if (error || !order) throw new Error('Order tidak ditemukan');
+        if (supabase && orderId) {
+            const { data, error } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('order_id', orderId)
+                .maybeSingle();
 
-        // Mark Order as PAID
-        await supabase
-            .from('orders')
-            .update({ status: 'PAID' })
-            .eq('order_id', orderId);
+            if (!error && data) {
+                order = data;
+                // Mark Order as PAID in DB
+                await supabase
+                    .from('orders')
+                    .update({ status: 'PAID' })
+                    .eq('order_id', orderId);
+            }
+        }
 
-        // Fetch current sub
+        if (!order) {
+            throw new Error('Order tidak ditemukan');
+        }
+
+        order.status = 'PAID';
+
+        // Update local order cache
+        try {
+            const localOrdersStr = localStorage.getItem('local_user_orders') || '[]';
+            const localOrders = JSON.parse(localOrdersStr);
+            const existingIdx = localOrders.findIndex(o => o.order_id === orderId);
+            if (existingIdx >= 0) {
+                localOrders[existingIdx] = order;
+            } else {
+                localOrders.unshift(order);
+            }
+            localStorage.setItem('local_user_orders', JSON.stringify(localOrders));
+        } catch {}
+
+        // Fetch current sub & calculate new subscription dates
         const currentSub = await getUserSubscriptionStatus(order.user_id);
         const newDates = calculateRenewalDates(currentSub, order.plan_code);
 
@@ -371,27 +415,35 @@ export const processOrderPayment = async (orderId) => {
             subscription_status: 'ACTIVE',
             subscription_start: newDates.subscription_start,
             subscription_end: newDates.subscription_end,
-            source: 'PAID',
+            source: order.source || 'PAID',
             updated_at: new Date().toISOString()
         };
 
-        // Check if row exists for user
-        const { data: existingSub } = await supabase
-            .from('user_subscriptions')
-            .select('id')
-            .eq('user_id', order.user_id)
-            .maybeSingle();
+        if (supabase) {
+            try {
+                const { data: existingSub } = await supabase
+                    .from('user_subscriptions')
+                    .select('id')
+                    .eq('user_id', order.user_id)
+                    .maybeSingle();
 
-        if (existingSub) {
-            await supabase
-                .from('user_subscriptions')
-                .update(subPayload)
-                .eq('id', existingSub.id);
-        } else {
-            await supabase
-                .from('user_subscriptions')
-                .insert([subPayload]);
+                if (existingSub) {
+                    await supabase
+                        .from('user_subscriptions')
+                        .update(subPayload)
+                        .eq('id', existingSub.id);
+                } else {
+                    await supabase
+                        .from('user_subscriptions')
+                        .insert([subPayload]);
+                }
+            } catch (dbErr) {
+                console.warn('Supabase DB sub update warning:', dbErr);
+            }
         }
+
+        // Save local backup as well
+        localStorage.setItem(`local_sub_${order.user_id}`, JSON.stringify(subPayload));
 
         return { success: true, order, subPayload };
     } catch (err) {

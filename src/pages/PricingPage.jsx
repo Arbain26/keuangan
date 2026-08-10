@@ -114,7 +114,7 @@ const PricingPage = () => {
             });
 
             // 2. Process Simulated Payment Gateway Completion
-            const payRes = await processOrderPayment(order.order_id);
+            const payRes = await processOrderPayment(order.order_id, order);
 
             // 3. Update local user subscription state
             const updatedSub = await getUserSubscriptionStatus(user.id);
