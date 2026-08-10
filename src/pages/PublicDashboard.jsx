@@ -255,6 +255,10 @@ const PublicDashboard = () => {
                                 transition={{ duration: 0.5 }}
                                 src="/logo.jpg"
                                 alt="My Finance Logo"
+                                width="36"
+                                height="36"
+                                decoding="async"
+                                loading="eager"
                                 className="w-9 h-9 rounded-lg object-cover shadow-sm"
                             />
                             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">
@@ -262,7 +266,7 @@ const PublicDashboard = () => {
                             </h1>
                         </div>
                         <div className="flex items-center gap-6">
-                            <button onClick={scrollToStats} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition cursor-pointer">
+                            <button onClick={scrollToStats} className="text-gray-700 hover:text-blue-600 text-sm font-medium transition cursor-pointer">
                                 Data Publik
                             </button>
                             <Link
@@ -276,6 +280,8 @@ const PublicDashboard = () => {
                     </div>
                 </div>
             </nav>
+
+            <main id="main-content">
 
             {/* Hero Section */}
             <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-blue-50/50 to-white">
@@ -468,14 +474,16 @@ const PublicDashboard = () => {
                                 <span className="text-blue-600 font-bold text-xs uppercase tracking-wider">Cari Per Bulan:</span>
                             </div>
                             <div className="flex-1 w-full">
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Bulan</label>
+                                <label htmlFor="select-month" className="block text-[10px] font-bold text-gray-700 uppercase mb-1 ml-1">Bulan</label>
                                 <select
+                                    id="select-month"
+                                    aria-label="Pilih Bulan Data Transaksi"
                                     value={selectedMonth}
                                     onChange={(e) => {
                                         setSelectedMonth(parseInt(e.target.value));
                                         setActivePeriod('month');
                                     }}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
+                                    className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
                                 >
                                     {['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'].map((month, idx) => (
                                         <option key={idx} value={idx}>{month}</option>
@@ -483,14 +491,16 @@ const PublicDashboard = () => {
                                 </select>
                             </div>
                             <div className="flex-1 w-full">
-                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Tahun</label>
+                                <label htmlFor="select-year" className="block text-[10px] font-bold text-gray-700 uppercase mb-1 ml-1">Tahun</label>
                                 <select
+                                    id="select-year"
+                                    aria-label="Pilih Tahun Data Transaksi"
                                     value={selectedYear}
                                     onChange={(e) => {
                                         setSelectedYear(parseInt(e.target.value));
                                         setActivePeriod('year');
                                     }}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
+                                    className="w-full bg-gray-50 border border-gray-200 text-gray-900 rounded-xl px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition cursor-pointer hover:border-blue-300"
                                 >
                                     {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
                                         <option key={year} value={year}>{year}</option>
@@ -700,7 +710,8 @@ const PublicDashboard = () => {
                     </div>
                 </motion.div>
             </section>
-            <footer className="bg-white border-t py-12 text-center text-gray-400 text-sm">
+            </main>
+            <footer className="bg-white border-t py-12 text-center text-gray-600 text-sm">
                 <p>&copy; {new Date().getFullYear()} FinTrack. Dibuat untuk manajemen keuangan yang lebih baik.</p>
             </footer>
         </div >

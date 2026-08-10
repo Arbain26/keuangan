@@ -241,23 +241,35 @@ const AdminDashboard = () => {
         if (!file) return;
 
         setIsScanningReceipt(true);
-        setScanProgress('Membaca foto nota...');
+        setScanProgress('Membaca & memproses foto nota...');
         try {
             const scannedData = await scanReceiptImage(file, (msg) => setScanProgress(msg));
             
-            setFormData(prev => ({
-                ...prev,
-                type: scannedData.type || 'pengeluaran',
-                amount: scannedData.amount ? formatNumberInput(scannedData.amount) : prev.amount,
-                date: scannedData.date || prev.date,
-                category: scannedData.category || prev.category,
-                description: scannedData.description || prev.description
-            }));
-
-            const isStd = CATEGORIES.some(cat => cat.id === (scannedData.category || '').toLowerCase());
-            setIsCustomCategory(!isStd && scannedData.category !== '');
-
-            showToast('Foto nota berhasil dipindai! Silakan periksa & simpan transaksi.');
+            if (scannedData.amount > 0) {
+                const dataToSubmit = {
+                    type: scannedData.type || 'pengeluaran',
+                    amount: scannedData.amount,
+                    date: scannedData.date || new Date().toISOString().split('T')[0],
+                    category: normalizeCategory(scannedData.category || 'lainnya', scannedData.type || 'pengeluaran'),
+                    description: (scannedData.description || 'Transaksi Struk').trim().toLowerCase()
+                };
+                await createTransaction(dataToSubmit);
+                const data = await fetchTransactions();
+                setTransactions(Array.isArray(data) ? data : []);
+                showToast(`Transaksi dari foto struk (Rp ${formatNumberInput(scannedData.amount)}) berhasil disimpan otomatis!`);
+            } else {
+                setFormData(prev => ({
+                    ...prev,
+                    type: scannedData.type || 'pengeluaran',
+                    amount: scannedData.amount ? formatNumberInput(scannedData.amount) : prev.amount,
+                    date: scannedData.date || prev.date,
+                    category: scannedData.category || prev.category,
+                    description: scannedData.description || prev.description
+                }));
+                const isStd = CATEGORIES.some(cat => cat.id === (scannedData.category || '').toLowerCase());
+                setIsCustomCategory(!isStd && scannedData.category !== '');
+                showToast('Foto nota berhasil dibaca. Silakan lengkapi nominal & simpan.', 'error');
+            }
         } catch (error) {
             console.error('Error scanning receipt:', error);
             showToast('Gagal membaca foto nota. Silakan input manual.', 'error');
@@ -1130,11 +1142,13 @@ const AdminDashboard = () => {
                                     {activeTab === 'transactions' && (
                                         <div className="flex flex-wrap items-center gap-2">
                                             <input 
+                                                id="excel-file-input"
                                                 type="file" 
                                                 accept=".xlsx, .xls" 
                                                 ref={fileInputRef} 
                                                 onChange={handleUploadExcel} 
                                                 hidden 
+                                                aria-label="Unggah file Excel"
                                             />
                                             <button
                                                 onClick={() => fileInputRef.current?.click()}
@@ -1282,11 +1296,13 @@ const AdminDashboard = () => {
                                                 </div>
 
                                                 <input
+                                                    id="receipt-file-input"
                                                     type="file"
                                                     ref={receiptInputRef}
                                                     onChange={handleReceiptPhotoUpload}
                                                     accept="image/*"
                                                     className="hidden"
+                                                    aria-label="Unggah foto nota atau struk"
                                                 />
 
                                                 <button
@@ -1313,24 +1329,25 @@ const AdminDashboard = () => {
                                                         <button
                                                             type="button"
                                                             onClick={() => setFormData({ ...formData, type: 'pemasukan' })}
-                                                            className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pemasukan' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                                            className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pemasukan' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
                                                             Pemasukan
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setFormData({ ...formData, type: 'pengeluaran' })}
-                                                            className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pengeluaran' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+                                                            className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pengeluaran' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
                                                             Pengeluaran
                                                         </button>
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-xs font-medium text-gray-500 mb-1.5 pl-1">Tanggal</label>
+                                                        <label htmlFor="trans-date" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Tanggal</label>
                                                         <div className="relative">
-                                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                                                             <input
+                                                                id="trans-date"
                                                                 type="date"
                                                                 value={formData.date}
                                                                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
@@ -1341,10 +1358,11 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-xs font-medium text-gray-500 mb-1.5 pl-1">Jumlah</label>
+                                                        <label htmlFor="trans-amount" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Jumlah</label>
                                                         <div className="relative">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm font-bold">Rp</span>
                                                             <input
+                                                                id="trans-amount"
                                                                 type="text"
                                                                 placeholder="0"
                                                                 value={formData.amount}
@@ -1356,8 +1374,10 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                         <label className="block text-xs font-medium text-gray-500 mb-1.5 pl-1">Kategori</label>
+                                                         <label htmlFor="trans-category-select" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Kategori</label>
                                                          <select
+                                                             id="trans-category-select"
+                                                             aria-label="Pilih Kategori Transaksi"
                                                              value={isCustomCategory ? 'Lainnya' : (CATEGORIES.some(c => c.id === formData.category) ? formData.category : (formData.category ? 'Lainnya' : ''))}
                                                              onChange={(e) => {
                                                                  const val = e.target.value;
@@ -1382,7 +1402,9 @@ const AdminDashboard = () => {
 
                                                          {isCustomCategory && (
                                                              <input
+                                                                 id="trans-custom-category"
                                                                  type="text"
+                                                                 aria-label="Ketik Kategori Kustom"
                                                                  placeholder="Ketik Kategori Kustom..."
                                                                  value={formData.category}
                                                                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -1391,8 +1413,9 @@ const AdminDashboard = () => {
                                                              />
                                                          )}
 
-                                                         <label className="block text-xs font-medium text-gray-500 mb-1.5 pl-1">Keterangan / Catatan</label>
+                                                         <label htmlFor="trans-desc" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Keterangan / Catatan</label>
                                                          <textarea
+                                                             id="trans-desc"
                                                              placeholder="Catatan tambahan (opsional)"
                                                              value={formData.description}
                                                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -1434,6 +1457,8 @@ const AdminDashboard = () => {
                                                     <div className="relative w-full md:w-64">
                                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                                         <input
+                                                            id="search-transactions-input"
+                                                            aria-label="Cari data transaksi"
                                                             type="text"
                                                             placeholder="Cari transaksi..."
                                                             value={searchTerm}
@@ -1626,17 +1651,17 @@ const AdminDashboard = () => {
 
                                         <form onSubmit={handleUpdateProfile} className="space-y-6">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-600 mb-2">Email Akun</label>
-                                                <input type="text" value={profileData.email} disabled className="w-full bg-gray-100 border border-gray-200 text-gray-500 rounded-lg p-3 text-sm cursor-not-allowed" />
-                                                <p className="text-xs text-gray-400 mt-1">Email tidak dapat diubah.</p>
+                                                <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-2">Email Akun</label>
+                                                <input id="profile-email" type="text" value={profileData.email} disabled className="w-full bg-gray-100 border border-gray-200 text-gray-600 rounded-lg p-3 text-sm cursor-not-allowed" />
+                                                <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah.</p>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-600 mb-2">Nama Lengkap</label>
-                                                <input type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
+                                                <label htmlFor="profile-fullname" className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
+                                                <input id="profile-fullname" type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-600 mb-2">Password Baru</label>
-                                                <input type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="Biarkan kosong jika tidak ingin mengganti" className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
+                                                <label htmlFor="profile-newpassword" className="block text-sm font-medium text-gray-700 mb-2">Password Baru</label>
+                                                <input id="profile-newpassword" type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="Biarkan kosong jika tidak ingin mengganti" className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
                                             </div>
                                             <div className="pt-4">
                                                 <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 w-full md:w-auto">

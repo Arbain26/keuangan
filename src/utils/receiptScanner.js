@@ -1,12 +1,24 @@
-import { createWorker } from 'tesseract.js';
 import { normalizeCategory } from './format';
 
 export const scanReceiptImage = async (imageFile, onProgress) => {
     try {
-        const worker = await createWorker('ind+eng');
+        if (onProgress) {
+            onProgress('Menginisialisasi pemindai OCR...');
+        }
+
+        // Dynamic import of tesseract.js to save bundle size on initial page load
+        const { createWorker } = await import('tesseract.js');
+        
+        let worker;
+        try {
+            worker = await createWorker('ind+eng');
+        } catch {
+            // Fallback to English if ind language traineddata download fails
+            worker = await createWorker('eng');
+        }
         
         if (onProgress) {
-            onProgress('Membaca gambar nota...');
+            onProgress('Membaca teks dari foto struk...');
         }
 
         const { data: { text } } = await worker.recognize(imageFile);
@@ -17,7 +29,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
 
         // 1. Detect Amount (Nominal)
         let amount = 0;
-        const totalLineRegex = /(total|grand\s*total|bayar|jumlah|subtotal|rp\.?|cash|dibayar)\s*:?\s*r?p?\.?\s*([\d\.,\s]+)/i;
+        const totalLineRegex = /(total|grand\s*total|bayar|jumlah|subtotal|rp\.?|cash|tunai|dibayar|netto|tagihan|harga\s*total)\s*:?\s*r?p?\.?\s*([\d\.,\s]+)/i;
         
         for (const line of lines) {
             const match = line.match(totalLineRegex);
@@ -30,14 +42,14 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             }
         }
 
-        // Fallback: If no explicit TOTAL keyword line found, pick the largest numeric value
+        // Fallback: If no explicit TOTAL keyword line found, pick the largest plausible numeric value
         if (amount === 0) {
             for (const line of lines) {
                 const numberMatches = line.match(/\b\d{1,3}(?:\.\d{3})+(?!\d)|\b\d{4,8}\b/g);
                 if (numberMatches) {
                     for (const numStr of numberMatches) {
                         const parsed = parseInt(numStr.replace(/\D/g, ''), 10);
-                        if (parsed > 1000 && parsed < 100000000 && parsed > amount) {
+                        if (parsed >= 1000 && parsed <= 500000000 && parsed > amount) {
                             amount = parsed;
                         }
                     }
@@ -72,7 +84,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
 
         // 3. Detect Type (Pemasukan vs Pengeluaran)
         let type = 'pengeluaran';
-        if (/\b(pemasukan|gaji|income|transfer masuk|cr|kredit|saldo masuk)\b/i.test(cleanText)) {
+        if (/\b(pemasukan|gaji|income|transfer masuk|cr|kredit|saldo masuk|penjualan)\b/i.test(cleanText)) {
             type = 'pemasukan';
         }
 
@@ -83,16 +95,20 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         let description = '';
         if (lines.length > 0) {
             // First non-numeric line usually contains store name
-            const storeLine = lines.find(l => !/^\d+$/.test(l) && l.length > 3 && !/nota|receipt|struk/i.test(l));
-            description = storeLine ? storeLine.substring(0, 50).trim() : 'Transaksi Foto Nota';
+            const storeLine = lines.find(l => 
+                !/^\d+$/.test(l) && 
+                l.length >= 3 && 
+                !/nota|receipt|struk|faktur|bill|invoice|selamat\s*datang/i.test(l)
+            );
+            description = storeLine ? storeLine.substring(0, 60).trim() : 'Transaksi Struk';
         }
 
         return {
             amount,
             date: dateStr,
             type,
-            category,
-            description,
+            category: category || 'lainnya',
+            description: description || 'Transaksi Struk',
             rawText: cleanText
         };
     } catch (error) {

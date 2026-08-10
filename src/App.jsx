@@ -1,16 +1,25 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import PublicDashboard from './pages/PublicDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminLogin from './pages/AdminLogin';
-import Register from './pages/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { supabase } from './lib/supabaseClient';
 
+const PublicDashboard = lazy(() => import('./pages/PublicDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const Register = lazy(() => import('./pages/Register'));
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700">
+    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+    <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Memuat Halaman...</p>
+  </div>
+);
+
 function App() {
   if (!supabase) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <main className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
         <div className="max-w-md w-full bg-white p-8 rounded-lg shadow-md border-l-4 border-red-500">
           <h1 className="text-xl font-bold text-red-600 mb-4">Konfigurasi Belum Selesai</h1>
           <p className="text-gray-700 mb-4">
@@ -27,7 +36,7 @@ function App() {
             Jangan lupa restart terminal (npm run dev) setelah membuat file .env.
           </p>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -35,31 +44,33 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
         <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<PublicDashboard />} />
-            <Route path="/login" element={<AdminLogin />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="*"
-              element={
-                <div className="min-h-screen bg-black text-green-500 flex flex-col items-center justify-center font-['Share_Tech_Mono']">
-                  <h1 className="text-6xl font-bold mb-4 drop-shadow-[0_0_10px_#00ff00]">404</h1>
-                  <p className="text-xl uppercase tracking-widest mb-8">Page Not Found / System Error</p>
-                  <a href="/" className="px-6 py-2 border border-green-500 hover:bg-green-500 hover:text-black transition uppercase">
-                    Return to Dashboard
-                  </a>
-                </div>
-              }
-            />
-          </Routes>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/" element={<PublicDashboard />} />
+              <Route path="/login" element={<AdminLogin />} />
+              <Route path="/register" element={<Register />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <div className="min-h-screen bg-black text-green-500 flex flex-col items-center justify-center font-['Share_Tech_Mono']">
+                    <h1 className="text-6xl font-bold mb-4 drop-shadow-[0_0_10px_#00ff00]">404</h1>
+                    <p className="text-xl uppercase tracking-widest mb-8">Page Not Found / System Error</p>
+                    <a href="/" className="px-6 py-2 border border-green-500 hover:bg-green-500 hover:text-black transition uppercase">
+                      Return to Dashboard
+                    </a>
+                  </div>
+                }
+              />
+            </Routes>
+          </Suspense>
         </ErrorBoundary>
       </div>
     </Router>

@@ -1,0 +1,16 @@
+# FinTrack System
+
+> Platform Manajemen Keuangan Terbuka dan Transparan.
+
+## Overview
+FinTrack System adalah aplikasi berbasis web yang memfasilitasi pencatatan, pengolahan, dan visualisasi transaksi keuangan (pemasukan & pengeluaran) secara transparan.
+
+## Features & Endpoints
+- [Public Dashboard](https://fintrack.example.com/): Menampilkan grafik arus kas, perbandingan pemasukan & pengeluaran bulanan, riwayat transaksi, serta tips edukasi keuangan.
+- [Admin Portal](https://fintrack.example.com/login): Portal autentikasi dan pengolahan data transaksi keuangan secara realtime dengan dukungan OCR pemindaian foto nota/struk.
+
+## Technical Specifications
+- Framework: React + Vite
+- State & Auth Backend: Supabase JS Client
+- Visualization: Chart.js & Framer Motion
+- OCR Engine: Tesseract.js (Indonesian & English support)
