@@ -101,20 +101,38 @@ alter table public.orders enable row level security;
 alter table public.usage_limits enable row level security;
 
 -- Policies for public read
+drop policy if exists "Allow public read on plans" on public.plans;
 create policy "Allow public read on plans" on public.plans for select to anon, authenticated using (true);
+
+drop policy if exists "Allow public read on promo_codes" on public.promo_codes;
 create policy "Allow public read on promo_codes" on public.promo_codes for select to anon, authenticated using (true);
+
+drop policy if exists "Allow public read on usage_limits" on public.usage_limits;
 create policy "Allow public read on usage_limits" on public.usage_limits for select to anon, authenticated using (true);
 
 -- Policies for user subscriptions
+drop policy if exists "Allow users to read their own subscription" on public.user_subscriptions;
 create policy "Allow users to read their own subscription" on public.user_subscriptions for select to authenticated using (auth.uid() = user_id or true);
+
+drop policy if exists "Allow users to write subscription" on public.user_subscriptions;
 create policy "Allow users to write subscription" on public.user_subscriptions for all to authenticated using (true) with check (true);
 
 -- Policies for orders
+drop policy if exists "Allow users to read orders" on public.orders;
 create policy "Allow users to read orders" on public.orders for select to authenticated using (auth.uid() = user_id or true);
+
+drop policy if exists "Allow users to insert orders" on public.orders;
 create policy "Allow users to insert orders" on public.orders for insert to authenticated with check (true);
+
+drop policy if exists "Allow admin to update orders" on public.orders;
 create policy "Allow admin to update orders" on public.orders for update to authenticated using (true) with check (true);
 
 -- Policies for admin write on plans, promo_codes, usage_limits
+drop policy if exists "Allow admin all on plans" on public.plans;
 create policy "Allow admin all on plans" on public.plans for all to authenticated using (true) with check (true);
+
+drop policy if exists "Allow admin all on promo_codes" on public.promo_codes;
 create policy "Allow admin all on promo_codes" on public.promo_codes for all to authenticated using (true) with check (true);
+
+drop policy if exists "Allow admin all on usage_limits" on public.usage_limits;
 create policy "Allow admin all on usage_limits" on public.usage_limits for all to authenticated using (true) with check (true);
