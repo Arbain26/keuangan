@@ -245,8 +245,7 @@ const AdminDashboard = () => {
         try {
             const scannedData = await scanReceiptImage(file, (msg) => setScanProgress(msg));
             
-            const isNoise = (str) => !str || str === 'Transaksi Struk' || /%/.test(str) || /\b\d{1,2}[\.:]\d{2}\b/.test(str) || /\b(4g|5g|lte|ge)\b/i.test(str);
-            const finalDesc = (!isNoise(scannedData.description) && scannedData.description.trim() !== '') 
+            const finalDesc = scannedData.description && scannedData.description.trim() !== '' 
                 ? scannedData.description.trim().toLowerCase() 
                 : '-';
 
