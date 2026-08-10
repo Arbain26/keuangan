@@ -1135,17 +1135,23 @@ const AdminDashboard = () => {
                             <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
                             <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" />
                             <SidebarItem id="reports" icon={FileText} label="Laporan" />
-                            <SidebarItem id="subscriptions" icon={Zap} label="Kelola Langganan" />
+                            {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
+                                <SidebarItem id="subscriptions" icon={Zap} label="Kelola Langganan" />
+                            )}
 
-                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Paket & Akun</p>
-                            <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
-                                <Sparkles className="w-4 h-4 text-amber-500" />
-                                Upgrade / Paket Premium
-                            </Link>
-                            <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
-                                <ShoppingBag className="w-4 h-4 text-gray-400" />
-                                Riwayat Pesanan Paket
-                            </Link>
+                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Pengaturan Akun</p>
+                            {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
+                                <>
+                                    <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                        <Sparkles className="w-4 h-4 text-amber-500" />
+                                        Upgrade / Paket Premium
+                                    </Link>
+                                    <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                        <ShoppingBag className="w-4 h-4 text-gray-400" />
+                                        Riwayat Pesanan Paket
+                                    </Link>
+                                </>
+                            )}
                             <SidebarItem id="profile" icon={User} label="Profil User" />
                             <Link to="/" target="_blank" className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3">
                                 <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -1197,7 +1203,7 @@ const AdminDashboard = () => {
                                             }[activeTab]}
                                         </p>
                                     </div>
-                                    {activeTab === 'subscriptions' && (
+                                    {activeTab === 'subscriptions' && user?.email?.toLowerCase() === 'arbain@gmail.com' && (
                                         <button
                                             onClick={() => setIsGrantModalOpen(true)}
                                             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-sm font-bold rounded-lg hover:from-amber-600 hover:to-amber-700 transition shadow-lg shadow-amber-500/20"
@@ -1256,13 +1262,14 @@ const AdminDashboard = () => {
                                     >
                                         {activeTab === 'dashboard' && (
                                             <div className="space-y-6">
-                                                {/* STATUS AKUN CARD */}
-                                                <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-3xl p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                                    <div>
-                                                        <div className="flex items-center space-x-2 mb-2">
-                                                            <span className="text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full">
-                                                                STATUS AKUN
-                                                            </span>
+                                                {/* STATUS AKUN CARD (Hanya untuk arbain@gmail.com) */}
+                                                {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
+                                                    <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-3xl p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                        <div>
+                                                            <div className="flex items-center space-x-2 mb-2">
+                                                                <span className="text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full">
+                                                                    STATUS AKUN
+                                                                </span>
                                                             {userSub?.plan_code === 'PREMIUM_LIFETIME' ? (
                                                                 <span className="text-[10px] font-black uppercase tracking-widest bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
                                                                     LIFETIME ACCESS
@@ -1321,6 +1328,7 @@ const AdminDashboard = () => {
                                                         )}
                                                     </div>
                                                 </div>
+                                                )}
 
                                                 <FilterButtons />
                                                 {/* Stats Cards */}

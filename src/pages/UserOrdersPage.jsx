@@ -37,8 +37,8 @@ const UserOrdersPage = () => {
                 return;
             }
             const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (!currentUser) {
-                navigate('/login?redirect=/my-orders');
+            if (!currentUser || currentUser.email?.toLowerCase() !== 'arbain@gmail.com') {
+                navigate(currentUser ? '/admin' : '/login?redirect=/my-orders');
                 return;
             }
             setUser(currentUser);
