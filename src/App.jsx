@@ -8,6 +8,8 @@ const PublicDashboard = lazy(() => import('./pages/PublicDashboard'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const Register = lazy(() => import('./pages/Register'));
+const PricingPage = lazy(() => import('./pages/PricingPage'));
+const UserOrdersPage = lazy(() => import('./pages/UserOrdersPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700">
@@ -49,6 +51,16 @@ function App() {
               <Route path="/" element={<PublicDashboard />} />
               <Route path="/login" element={<AdminLogin />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/premium" element={<PricingPage />} />
+              <Route
+                path="/my-orders"
+                element={
+                  <ProtectedRoute>
+                    <UserOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/admin"
                 element={

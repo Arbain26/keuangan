@@ -1,9 +1,18 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag } from 'lucide-react';
 import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
 import { scanReceiptImage } from '../utils/receiptScanner';
+import { 
+    getUserSubscriptionStatus, 
+    checkFeatureAccess, 
+    adminGrantPremium, 
+    fetchPlans, 
+    fetchUsageLimits,
+    DEFAULT_PLANS,
+    DEFAULT_LIMITS 
+} from '../utils/subscriptionEngine';
 import { Link } from 'react-router-dom';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import ExcelJS from 'exceljs';
@@ -236,6 +245,20 @@ const AdminDashboard = () => {
     const [toast, setToast] = useState(null);
     const [isCustomCategory, setIsCustomCategory] = useState(false);
 
+    // Subscription & Limit State
+    const [userSub, setUserSub] = useState(null);
+    const [usageLimits, setUsageLimits] = useState(DEFAULT_LIMITS);
+    const [plans, setPlans] = useState(DEFAULT_PLANS);
+    const [allSubscriptions, setAllSubscriptions] = useState([]);
+    const [allOrders, setAllOrders] = useState([]);
+    const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
+    const [grantForm, setGrantForm] = useState({
+        targetUserId: '',
+        planCode: 'PREMIUM_MONTHLY',
+        note: ''
+    });
+    const [limitModal, setLimitModal] = useState(null);
+
     const handleReceiptPhotoUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -304,12 +327,16 @@ const AdminDashboard = () => {
     const loadInitialData = async () => {
         setLoading(true);
         try {
-            const [transData, userData] = await Promise.all([
+            const [transData, userData, planList, limits] = await Promise.all([
                 fetchTransactions(),
-                supabase.auth.getUser()
+                supabase.auth.getUser(),
+                fetchPlans(),
+                fetchUsageLimits()
             ]);
 
             setTransactions(Array.isArray(transData) ? transData : []);
+            setPlans(planList);
+            setUsageLimits(limits);
 
             if (userData?.data?.user) {
                 const activeUser = userData.data.user;
@@ -319,6 +346,19 @@ const AdminDashboard = () => {
                     email: activeUser.email,
                     fullName: activeUser.user_metadata?.full_name || 'Muhammad Arbain'
                 }));
+
+                const subStatus = await getUserSubscriptionStatus(activeUser.id);
+                setUserSub(subStatus);
+            }
+
+            // Fetch All Subscriptions & Orders for Admin Panel
+            if (supabase) {
+                const [subRes, orderRes] = await Promise.all([
+                    supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
+                    supabase.from('orders').select('*').order('created_at', { ascending: false })
+                ]);
+                if (subRes.data) setAllSubscriptions(subRes.data);
+                if (orderRes.data) setAllOrders(orderRes.data);
             }
         } catch (error) {
             console.error('Error loading initial data:', error);
@@ -337,9 +377,15 @@ const AdminDashboard = () => {
         if (!formData.amount || !formData.date || !formData.category) return;
         
         const amountCleaned = Number(formData.amount.toString().replace(/\D/g, '')) || 0;
-        if (amountCleaned <= 0) {
-            showToast('Jumlah nominal harus lebih besar dari 0.', 'error');
-            return;
+        if (!editingId) {
+            const access = await checkFeatureAccess(user, 'transaction', transactions.length);
+            if (!access.allowed) {
+                setLimitModal({
+                    title: 'Batas Transaksi Bulanan Terlampaui',
+                    message: `Pengguna FREE memiliki batas ${access.limit} transaksi per bulan. Anda telah mencatatkan ${access.usage} transaksi bulan ini. Upgrade ke Paket Premium untuk transaksi tanpa batas!`
+                });
+                return;
+            }
         }
 
         setIsSubmitting(true);
@@ -1089,8 +1135,17 @@ const AdminDashboard = () => {
                             <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
                             <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" />
                             <SidebarItem id="reports" icon={FileText} label="Laporan" />
+                            <SidebarItem id="subscriptions" icon={Zap} label="Kelola Langganan" />
 
-                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-6">Pengaturan</p>
+                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Paket & Akun</p>
+                            <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                Upgrade / Paket Premium
+                            </Link>
+                            <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                <ShoppingBag className="w-4 h-4 text-gray-400" />
+                                Riwayat Pesanan Paket
+                            </Link>
                             <SidebarItem id="profile" icon={User} label="Profil User" />
                             <Link to="/" target="_blank" className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3">
                                 <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -1128,6 +1183,7 @@ const AdminDashboard = () => {
                                                 dashboard: 'Dashboard Overview',
                                                 transactions: 'Manajemen Transaksi',
                                                 reports: 'Laporan Keuangan',
+                                                subscriptions: 'Manajemen Paket Langganan',
                                                 profile: 'Pengaturan Akun'
                                             }[activeTab]}
                                         </h2>
@@ -1136,10 +1192,20 @@ const AdminDashboard = () => {
                                                 dashboard: 'Ringkasan aktivitas keuangan Anda hari ini.',
                                                 transactions: 'Kelola pemasukan dan pengeluaran dengan mudah.',
                                                 reports: 'Analisis dan unduh laporan keuangan.',
+                                                subscriptions: 'Kelola paket Premium pengguna, statistik, dan pemberian akses admin.',
                                                 profile: 'Perbarui informasi dan keamanan akun Anda.'
                                             }[activeTab]}
                                         </p>
                                     </div>
+                                    {activeTab === 'subscriptions' && (
+                                        <button
+                                            onClick={() => setIsGrantModalOpen(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-sm font-bold rounded-lg hover:from-amber-600 hover:to-amber-700 transition shadow-lg shadow-amber-500/20"
+                                        >
+                                            <Award className="w-4 h-4" />
+                                            + Berikan Premium (Admin)
+                                        </button>
+                                    )}
                                     {activeTab === 'reports' && (
                                         <button
                                             onClick={exportToExcel}
@@ -1190,6 +1256,72 @@ const AdminDashboard = () => {
                                     >
                                         {activeTab === 'dashboard' && (
                                             <div className="space-y-6">
+                                                {/* STATUS AKUN CARD */}
+                                                <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-3xl p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                    <div>
+                                                        <div className="flex items-center space-x-2 mb-2">
+                                                            <span className="text-[10px] font-black uppercase tracking-widest bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-0.5 rounded-full">
+                                                                STATUS AKUN
+                                                            </span>
+                                                            {userSub?.plan_code === 'PREMIUM_LIFETIME' ? (
+                                                                <span className="text-[10px] font-black uppercase tracking-widest bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+                                                                    LIFETIME ACCESS
+                                                                </span>
+                                                            ) : userSub?.subscription_status === 'ACTIVE' ? (
+                                                                <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                                                                    ACTIVE PREMIUM
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-black uppercase tracking-widest bg-gray-700 text-gray-300 px-2.5 py-0.5 rounded-full">
+                                                                    FREE PLAN
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <h3 className="text-xl md:text-2xl font-extrabold text-white">
+                                                            {userSub?.plan_code === 'PREMIUM_LIFETIME'
+                                                                ? 'Premium Unlimited'
+                                                                : userSub?.plan_code === 'PREMIUM_YEARLY' && userSub?.subscription_status === 'ACTIVE'
+                                                                ? 'Premium 1 Tahun'
+                                                                : userSub?.plan_code === 'PREMIUM_MONTHLY' && userSub?.subscription_status === 'ACTIVE'
+                                                                ? 'Premium 1 Bulan'
+                                                                : 'FREE PLAN'}
+                                                        </h3>
+
+                                                        <p className="text-gray-300 text-xs mt-1">
+                                                            {userSub?.plan_code === 'PREMIUM_LIFETIME' ? (
+                                                                <span>Masa aktif: <strong>Selamanya (Lifetime)</strong>. ✓ Tidak perlu perpanjangan</span>
+                                                            ) : userSub?.subscription_status === 'ACTIVE' && userSub?.subscription_end ? (
+                                                                <span>Aktif sampai: <strong>{formatDate(userSub.subscription_end)}</strong></span>
+                                                            ) : (
+                                                                <span>Anda sedang menggunakan paket Gratis. Penggunaan bulan ini: <strong>{transactions.length} / {usageLimits.free_max_transactions_monthly}</strong></span>
+                                                            )}
+                                                        </p>
+                                                    </div>
+
+                                                    <div>
+                                                        {userSub?.plan_code === 'PREMIUM_LIFETIME' ? (
+                                                            <div className="text-xs font-bold text-amber-400 bg-amber-400/10 border border-amber-400/30 px-4 py-2.5 rounded-xl flex items-center">
+                                                                ✓ Lifetime Active
+                                                            </div>
+                                                        ) : userSub?.subscription_status === 'ACTIVE' ? (
+                                                            <Link
+                                                                to="/pricing"
+                                                                className="inline-flex items-center px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition shadow-lg shadow-blue-600/30"
+                                                            >
+                                                                Perpanjang Premium
+                                                            </Link>
+                                                        ) : (
+                                                            <Link
+                                                                to="/pricing"
+                                                                className="inline-flex items-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-xs hover:from-amber-500 hover:to-amber-600 transition shadow-lg shadow-amber-500/20"
+                                                            >
+                                                                Upgrade Premium
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </div>
+
                                                 <FilterButtons />
                                                 {/* Stats Cards */}
                                                 <motion.div 
@@ -1647,40 +1779,184 @@ const AdminDashboard = () => {
                                 )}
 
                                 {activeTab === 'profile' && (
-                                    <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-xl p-8 shadow-sm shadow-gray-100">
-                                        <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-200 pb-4">
-                                            Pengaturan Profil
-                                        </h2>
+                                     <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-xl p-8 shadow-sm shadow-gray-100">
+                                         <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-200 pb-4">
+                                             Pengaturan Profil
+                                         </h2>
 
-                                        {profileMessage && (
-                                            <div className="mb-6 p-4 rounded-lg border border-blue-100 bg-blue-50 text-blue-700 text-sm flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                                                {profileMessage}
-                                            </div>
-                                        )}
+                                         {profileMessage && (
+                                             <div className="mb-6 p-4 rounded-lg border border-blue-100 bg-blue-50 text-blue-700 text-sm flex items-center gap-2">
+                                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                                 {profileMessage}
+                                             </div>
+                                         )}
 
-                                        <form onSubmit={handleUpdateProfile} className="space-y-6">
-                                            <div>
-                                                <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-2">Email Akun</label>
-                                                <input id="profile-email" type="text" value={profileData.email} disabled className="w-full bg-gray-100 border border-gray-200 text-gray-600 rounded-lg p-3 text-sm cursor-not-allowed" />
-                                                <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah.</p>
-                                            </div>
-                                            <div>
-                                                <label htmlFor="profile-fullname" className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
-                                                <input id="profile-fullname" type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
-                                            </div>
-                                            <div>
-                                                <label htmlFor="profile-newpassword" className="block text-sm font-medium text-gray-700 mb-2">Password Baru</label>
-                                                <input id="profile-newpassword" type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="Biarkan kosong jika tidak ingin mengganti" className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
-                                            </div>
-                                            <div className="pt-4">
-                                                <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 w-full md:w-auto">
-                                                    Simpan Perubahan
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                )}
+                                         <form onSubmit={handleUpdateProfile} className="space-y-6">
+                                             <div>
+                                                 <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-2">Email Akun</label>
+                                                 <input id="profile-email" type="text" value={profileData.email} disabled className="w-full bg-gray-100 border border-gray-200 text-gray-600 rounded-lg p-3 text-sm cursor-not-allowed" />
+                                                 <p className="text-xs text-gray-500 mt-1">Email tidak dapat diubah.</p>
+                                             </div>
+                                             <div>
+                                                 <label htmlFor="profile-fullname" className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap</label>
+                                                 <input id="profile-fullname" type="text" value={profileData.fullName} onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })} className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
+                                             </div>
+                                             <div>
+                                                 <label htmlFor="profile-newpassword" className="block text-sm font-medium text-gray-700 mb-2">Password Baru</label>
+                                                 <input id="profile-newpassword" type="password" value={profileData.newPassword} onChange={(e) => setProfileData({ ...profileData, newPassword: e.target.value })} placeholder="Biarkan kosong jika tidak ingin mengganti" className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition" />
+                                             </div>
+                                             <div className="pt-4">
+                                                 <button type="submit" className="px-6 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 w-full md:w-auto">
+                                                     Simpan Perubahan
+                                                 </button>
+                                             </div>
+                                         </form>
+                                     </div>
+                                 )}
+
+                                 {activeTab === 'subscriptions' && (
+                                     <div className="space-y-8">
+                                         {/* Admin 11 Statistics Grid */}
+                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-gray-500 font-semibold mb-1">Total User</p>
+                                                 <h4 className="text-xl font-bold text-gray-900">{allSubscriptions.length || (user ? 1 : 0)}</h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-gray-500 font-semibold mb-1">Free User</p>
+                                                 <h4 className="text-xl font-bold text-gray-700">
+                                                     {allSubscriptions.filter(s => s.plan_code === 'FREE' || s.subscription_status === 'FREE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-blue-600 font-semibold mb-1">Premium User (Aktif)</p>
+                                                 <h4 className="text-xl font-bold text-blue-700">
+                                                     {allSubscriptions.filter(s => s.subscription_status === 'ACTIVE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-purple-600 font-semibold mb-1">Premium 1 Bulan</p>
+                                                 <h4 className="text-xl font-bold text-purple-700">
+                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_MONTHLY' && s.subscription_status === 'ACTIVE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-indigo-600 font-semibold mb-1">Premium 1 Tahun</p>
+                                                 <h4 className="text-xl font-bold text-indigo-700">
+                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_YEARLY' && s.subscription_status === 'ACTIVE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-amber-600 font-semibold mb-1">Premium Unlimited</p>
+                                                 <h4 className="text-xl font-bold text-amber-700">
+                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_LIFETIME' && s.subscription_status === 'ACTIVE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-emerald-600 font-semibold mb-1">Paid Premium</p>
+                                                 <h4 className="text-xl font-bold text-emerald-700">
+                                                     {allSubscriptions.filter(s => s.source === 'PAID').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-teal-600 font-semibold mb-1">Admin Granted</p>
+                                                 <h4 className="text-xl font-bold text-teal-700">
+                                                     {allSubscriptions.filter(s => s.source === 'ADMIN_GRANTED').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-green-600 font-semibold mb-1">Active Subscription</p>
+                                                 <h4 className="text-xl font-bold text-green-700">
+                                                     {allSubscriptions.filter(s => s.subscription_status === 'ACTIVE').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
+                                                 <p className="text-xs text-rose-600 font-semibold mb-1">Expired Subscription</p>
+                                                 <h4 className="text-xl font-bold text-rose-700">
+                                                     {allSubscriptions.filter(s => s.subscription_status === 'EXPIRED').length}
+                                                 </h4>
+                                             </div>
+                                             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-4 col-span-2 shadow-sm">
+                                                 <p className="text-xs font-semibold text-blue-100 mb-1">Total Revenue (Pendapatan)</p>
+                                                 <h4 className="text-2xl font-black">
+                                                     {formatCurrency(allOrders.filter(o => o.status === 'PAID').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
+                                                 </h4>
+                                             </div>
+                                         </div>
+
+                                         {/* Admin User Subscriptions Table */}
+                                         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                                             <div className="p-5 border-b border-gray-200 flex justify-between items-center">
+                                                 <h3 className="font-bold text-gray-900 text-base">Daftar Langganan Pengguna</h3>
+                                                 <button
+                                                     onClick={() => {
+                                                         setGrantForm(prev => ({ ...prev, targetUserId: user ? user.id : '' }));
+                                                         setIsGrantModalOpen(true);
+                                                     }}
+                                                     className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition shadow-sm"
+                                                 >
+                                                     + Berikan Premium (Admin)
+                                                 </button>
+                                             </div>
+                                             <div className="overflow-x-auto">
+                                                 <table className="w-full text-left text-xs text-gray-700 min-w-[700px]">
+                                                     <thead className="bg-gray-50 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-500">
+                                                         <tr>
+                                                             <th className="py-3.5 px-6">User ID</th>
+                                                             <th className="py-3.5 px-4">Paket</th>
+                                                             <th className="py-3.5 px-4">Source</th>
+                                                             <th className="py-3.5 px-4">Status</th>
+                                                             <th className="py-3.5 px-4">Start Date</th>
+                                                             <th className="py-3.5 px-6 text-right">End Date</th>
+                                                         </tr>
+                                                     </thead>
+                                                     <tbody className="divide-y divide-gray-100 font-medium">
+                                                         {allSubscriptions.length === 0 ? (
+                                                             <tr>
+                                                                 <td colSpan="6" className="py-8 text-center text-gray-400">
+                                                                     Belum ada data langganan tersimpan di database.
+                                                                 </td>
+                                                             </tr>
+                                                         ) : (
+                                                             allSubscriptions.map((sub) => (
+                                                                 <tr key={sub.id} className="hover:bg-gray-50/50 transition">
+                                                                     <td className="py-3.5 px-6 font-mono text-gray-900 font-bold">
+                                                                         {sub.user_id?.substring(0, 18)}...
+                                                                     </td>
+                                                                     <td className="py-3.5 px-4 font-bold text-blue-700">
+                                                                         {sub.plan_code === 'PREMIUM_MONTHLY' ? 'Premium 1 Bulan' : sub.plan_code === 'PREMIUM_YEARLY' ? 'Premium 1 Tahun' : sub.plan_code === 'PREMIUM_LIFETIME' ? 'Premium Unlimited' : 'FREE'}
+                                                                     </td>
+                                                                     <td className="py-3.5 px-4">
+                                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${sub.source === 'ADMIN_GRANTED' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                                                             {sub.source || 'PAID'}
+                                                                         </span>
+                                                                     </td>
+                                                                     <td className="py-3.5 px-4">
+                                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sub.subscription_status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                                                             {sub.subscription_status}
+                                                                         </span>
+                                                                     </td>
+                                                                     <td className="py-3.5 px-4 font-mono text-[11px] text-gray-600">
+                                                                         {formatDate(sub.subscription_start)}
+                                                                     </td>
+                                                                     <td className="py-3.5 px-6 text-right font-mono text-[11px] font-bold text-gray-800">
+                                                                         {sub.plan_code === 'PREMIUM_LIFETIME' ? (
+                                                                             <span className="text-amber-600">Lifetime</span>
+                                                                         ) : sub.subscription_end ? (
+                                                                             formatDate(sub.subscription_end)
+                                                                         ) : (
+                                                                             '-'
+                                                                         )}
+                                                                     </td>
+                                                                 </tr>
+                                                             ))
+                                                         )}
+                                                     </tbody>
+                                                 </table>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 )}
                                      </motion.div>
                                  </AnimatePresence>
                             </>
@@ -1688,6 +1964,126 @@ const AdminDashboard = () => {
                     </div>
                 </main>
             </div>
+
+            {/* Admin Grant Premium Modal */}
+            {isGrantModalOpen && (
+                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                     <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl relative border border-gray-100">
+                         <button
+                             onClick={() => setIsGrantModalOpen(false)}
+                             className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition"
+                         >
+                             <X className="w-5 h-5" />
+                         </button>
+
+                         <h3 className="text-xl font-bold text-gray-900 mb-1 flex items-center">
+                             <Award className="w-5 h-5 text-amber-500 mr-2" />
+                             Berikan Akses Premium (Admin)
+                         </h3>
+                         <p className="text-xs text-gray-500 mb-6">Pilih salah satu dari 3 paket Premium untuk diberikan kepada pengguna</p>
+
+                         <form onSubmit={async (e) => {
+                             e.preventDefault();
+                             if (!grantForm.targetUserId.trim()) {
+                                 showToast('Masukkan User ID target.', 'error');
+                                 return;
+                             }
+                             try {
+                                 setIsSubmitting(true);
+                                 await adminGrantPremium({
+                                     adminUserId: user ? user.id : 'ADMIN',
+                                     targetUserId: grantForm.targetUserId.trim(),
+                                     planCode: grantForm.planCode,
+                                     note: grantForm.note
+                                 });
+                                 showToast(`Berhasil memberikan paket ${grantForm.planCode}!`);
+                                 setIsGrantModalOpen(false);
+                                 setGrantForm({ targetUserId: '', planCode: 'PREMIUM_MONTHLY', note: '' });
+                                 loadInitialData();
+                             } catch (err) {
+                                 showToast(err.message || 'Gagal memberikan paket', 'error');
+                             } finally {
+                                 setIsSubmitting(false);
+                             }
+                         }} className="space-y-4">
+                             <div>
+                                 <label className="block text-xs font-bold text-gray-700 mb-1">User ID Target</label>
+                                 <input
+                                     type="text"
+                                     required
+                                     value={grantForm.targetUserId}
+                                     onChange={(e) => setGrantForm({ ...grantForm, targetUserId: e.target.value })}
+                                     placeholder="Masukkan UUID User"
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                 />
+                             </div>
+
+                             <div>
+                                 <label className="block text-xs font-bold text-gray-700 mb-1">Pilihan Paket Premium</label>
+                                 <select
+                                     value={grantForm.planCode}
+                                     onChange={(e) => setGrantForm({ ...grantForm, planCode: e.target.value })}
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                 >
+                                     <option value="PREMIUM_MONTHLY">Premium 1 Bulan (30 Hari)</option>
+                                     <option value="PREMIUM_YEARLY">Premium 1 Tahun (365 Hari)</option>
+                                     <option value="PREMIUM_LIFETIME">Premium Unlimited (Lifetime / Selamanya)</option>
+                                 </select>
+                             </div>
+
+                             <div>
+                                 <label className="block text-xs font-bold text-gray-700 mb-1">Catatan Admin (Opsional)</label>
+                                 <textarea
+                                     rows={2}
+                                     value={grantForm.note}
+                                     onChange={(e) => setGrantForm({ ...grantForm, note: e.target.value })}
+                                     placeholder="Alasan / catatan pemberian..."
+                                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                 />
+                             </div>
+
+                             <div className="pt-2">
+                                 <button
+                                     type="submit"
+                                     disabled={isSubmitting}
+                                     className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50"
+                                 >
+                                     {isSubmitting ? 'Memproses...' : 'Berikan Premium'}
+                                 </button>
+                             </div>
+                         </form>
+                     </div>
+                 </div>
+             )}
+
+             {/* Limit Exceeded Modal */}
+             {limitModal && (
+                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                     <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center shadow-2xl relative border border-gray-100">
+                         <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                             <AlertCircle className="w-8 h-8" />
+                         </div>
+                         <h3 className="text-xl font-bold text-gray-900 mb-2">{limitModal.title}</h3>
+                         <p className="text-xs text-gray-600 mb-6 leading-relaxed">{limitModal.message}</p>
+                         
+                         <div className="flex gap-3">
+                             <button
+                                 onClick={() => setLimitModal(null)}
+                                 className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition"
+                             >
+                                 Tutup
+                             </button>
+                             <Link
+                                 to="/pricing"
+                                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center justify-center"
+                             >
+                                 Upgrade Premium
+                             </Link>
+                         </div>
+                     </div>
+                 </div>
+             )}
+
             {/* Toast System Rendering */}
             <AnimatePresence>
                 {toast && (
