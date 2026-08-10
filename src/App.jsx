@@ -4,12 +4,30 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { supabase } from './lib/supabaseClient';
 
-const PublicDashboard = lazy(() => import('./pages/PublicDashboard'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const AdminLogin = lazy(() => import('./pages/AdminLogin'));
-const Register = lazy(() => import('./pages/Register'));
-const PricingPage = lazy(() => import('./pages/PricingPage'));
-const UserOrdersPage = lazy(() => import('./pages/UserOrdersPage'));
+// Helper to auto-retry dynamic import if Vercel deploys new build chunk assets
+const lazyWithRetry = (componentImport) =>
+  lazy(async () => {
+    const pageHasBeenReloaded = sessionStorage.getItem('page_reloaded_for_chunk');
+    try {
+      const component = await componentImport();
+      sessionStorage.removeItem('page_reloaded_for_chunk');
+      return component;
+    } catch (error) {
+      if (!pageHasBeenReloaded) {
+        sessionStorage.setItem('page_reloaded_for_chunk', 'true');
+        window.location.reload();
+        return new Promise(() => {}); // Pause until reload
+      }
+      throw error;
+    }
+  });
+
+const PublicDashboard = lazyWithRetry(() => import('./pages/PublicDashboard'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
+const AdminLogin = lazyWithRetry(() => import('./pages/AdminLogin'));
+const Register = lazyWithRetry(() => import('./pages/Register'));
+const PricingPage = lazyWithRetry(() => import('./pages/PricingPage'));
+const UserOrdersPage = lazyWithRetry(() => import('./pages/UserOrdersPage'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700">
