@@ -1139,19 +1139,15 @@ const AdminDashboard = () => {
                                 <SidebarItem id="subscriptions" icon={Zap} label="Kelola Langganan" />
                             )}
 
-                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Pengaturan Akun</p>
-                            {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
-                                <>
-                                    <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
-                                        <Sparkles className="w-4 h-4 text-amber-500" />
-                                        Upgrade / Paket Premium
-                                    </Link>
-                                    <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
-                                        <ShoppingBag className="w-4 h-4 text-gray-400" />
-                                        Riwayat Pesanan Paket
-                                    </Link>
-                                </>
-                            )}
+                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Paket & Akun</p>
+                            <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                Upgrade / Paket Premium
+                            </Link>
+                            <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
+                                <ShoppingBag className="w-4 h-4 text-gray-400" />
+                                Riwayat Pesanan Paket
+                            </Link>
                             <SidebarItem id="profile" icon={User} label="Profil User" />
                             <Link to="/" target="_blank" className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3">
                                 <ChevronRight className="w-5 h-5 text-gray-400" />

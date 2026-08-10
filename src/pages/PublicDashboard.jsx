@@ -269,6 +269,10 @@ const PublicDashboard = () => {
                             <button onClick={scrollToStats} className="text-gray-700 hover:text-blue-600 text-sm font-medium transition cursor-pointer">
                                 Data Publik
                             </button>
+                            <Link to="/pricing" className="text-amber-600 hover:text-amber-700 text-sm font-bold transition flex items-center gap-1">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                Paket Premium
+                            </Link>
                             <Link
                                 to="/login"
                                 className="flex items-center gap-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-4 py-2 rounded-full transition shadow-lg shadow-gray-200"

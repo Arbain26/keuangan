@@ -12,7 +12,7 @@ import {
 import { formatCurrency } from '../utils/format';
 import { 
     Check, X, Sparkles, Shield, Zap, Award, ArrowLeft, CreditCard, 
-    QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle
+    QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle, Copy
 } from 'lucide-react';
 
 const PricingPage = () => {
@@ -31,6 +31,13 @@ const PricingPage = () => {
     const [paymentMethod, setPaymentMethod] = useState('QRIS');
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     const [checkoutSuccess, setCheckoutSuccess] = useState(null);
+    const [copiedField, setCopiedField] = useState('');
+
+    const handleCopyText = (text, fieldName) => {
+        navigator.clipboard.writeText(text);
+        setCopiedField(fieldName);
+        setTimeout(() => setCopiedField(''), 2500);
+    };
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -620,7 +627,7 @@ const PricingPage = () => {
                                 {/* Payment Method Selector */}
                                 <div className="mb-6">
                                     <label className="block text-xs font-bold text-gray-700 mb-2">Metode Pembayaran</label>
-                                    <div className="grid grid-cols-3 gap-2.5">
+                                    <div className="grid grid-cols-3 gap-2.5 mb-4">
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod('QRIS')}
@@ -644,7 +651,7 @@ const PricingPage = () => {
                                             }`}
                                         >
                                             <Building2 className="w-5 h-5 mb-1 text-purple-600" />
-                                            Transfer VA
+                                            Transfer Bank (BRI)
                                         </button>
 
                                         <button
@@ -657,9 +664,93 @@ const PricingPage = () => {
                                             }`}
                                         >
                                             <Wallet className="w-5 h-5 mb-1 text-emerald-600" />
-                                            E-Wallet
+                                            E-Wallet (DANA/GoPay)
                                         </button>
                                     </div>
+
+                                    {/* Account Details Box */}
+                                    {paymentMethod === 'E-Wallet' && (
+                                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 text-xs">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="font-bold text-emerald-900 flex items-center">
+                                                    <Wallet className="w-4 h-4 mr-1.5 text-emerald-600" />
+                                                    E-Wallet (DANA / GoPay)
+                                                </span>
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-emerald-200 shadow-sm mt-2">
+                                                <div>
+                                                    <div className="text-[10px] text-gray-500 font-medium">Nomor E-Wallet</div>
+                                                    <div className="font-mono text-sm font-extrabold text-emerald-950">082215322757</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopyText('082215322757', 'ewallet')}
+                                                    className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                    {copiedField === 'ewallet' ? 'Tersalin!' : 'Salin'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {paymentMethod === 'Virtual Account' && (
+                                        <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 text-xs">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="font-bold text-purple-900 flex items-center">
+                                                    <Building2 className="w-4 h-4 mr-1.5 text-purple-600" />
+                                                    Rekening Bank BRI
+                                                </span>
+                                                <span className="text-[10px] bg-purple-100 text-purple-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-purple-200 shadow-sm mt-2">
+                                                <div>
+                                                    <div className="text-[10px] text-gray-500 font-medium">Nomor Rekening BRI</div>
+                                                    <div className="font-mono text-sm font-extrabold text-purple-950">362901036404538</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopyText('362901036404538', 'bri')}
+                                                    className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                    {copiedField === 'bri' ? 'Tersalin!' : 'Salin'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {paymentMethod === 'QRIS' && (
+                                        <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 text-xs">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="font-bold text-blue-900 flex items-center">
+                                                    <QrCode className="w-4 h-4 mr-1.5 text-blue-600" />
+                                                    QRIS / Transfer Langsung
+                                                </span>
+                                                <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
+                                            </div>
+                                            <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm mt-2 space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-500 font-medium">Nomor Tujuan E-Wallet / Rekening</div>
+                                                        <div className="font-mono text-sm font-extrabold text-blue-950">082215322757 (DANA/GoPay)</div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyText('082215322757', 'qris')}
+                                                        className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        {copiedField === 'qris' ? 'Tersalin!' : 'Salin'}
+                                                    </button>
+                                                </div>
+                                                <p className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
+                                                    Silakan transfer sesuai nominal di bawah, lalu klik <strong>Bayar Sekarang</strong>. Paket akan aktif otomatis!
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Order Price Calculation Summary */}
