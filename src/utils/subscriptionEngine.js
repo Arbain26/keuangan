@@ -236,31 +236,41 @@ export const verifyPromoCode = async (code, originalPrice) => {
 
     const cleanCode = code.trim().toUpperCase();
 
+    // Fallback promos if table not created yet in Supabase SQL editor
+    const FALLBACK_PROMOS = {
+        'HEMAT20': { discount_type: 'PERCENTAGE', discount_value: 20 },
+        'PROMO50': { discount_type: 'PERCENTAGE', discount_value: 50 }
+    };
+
     try {
-        if (!supabase) {
-            if (cleanCode === 'HEMAT20') {
-                const discount = Math.round(originalPrice * 0.20);
-                return { valid: true, code: cleanCode, discount_amount: discount, total_amount: originalPrice - discount };
+        let promo = null;
+
+        if (supabase) {
+            const { data, error } = await supabase
+                .from('promo_codes')
+                .select('*')
+                .eq('code', cleanCode)
+                .eq('is_active', true)
+                .maybeSingle();
+
+            if (!error && data) {
+                promo = data;
             }
-            return { valid: false, discount_amount: 0, total_amount: originalPrice, message: 'Kode promo tidak valid' };
         }
 
-        const { data, error } = await supabase
-            .from('promo_codes')
-            .select('*')
-            .eq('code', cleanCode)
-            .eq('is_active', true)
-            .maybeSingle();
+        if (!promo && FALLBACK_PROMOS[cleanCode]) {
+            promo = FALLBACK_PROMOS[cleanCode];
+        }
 
-        if (error || !data) {
+        if (!promo) {
             return { valid: false, discount_amount: 0, total_amount: originalPrice, message: 'Kode promo tidak ditemukan atau tidak aktif' };
         }
 
         let discount = 0;
-        if (data.discount_type === 'PERCENTAGE') {
-            discount = Math.round((originalPrice * data.discount_value) / 100);
+        if (promo.discount_type === 'PERCENTAGE') {
+            discount = Math.round((originalPrice * promo.discount_value) / 100);
         } else {
-            discount = data.discount_value;
+            discount = promo.discount_value;
         }
 
         discount = Math.min(discount, originalPrice);
@@ -269,12 +279,24 @@ export const verifyPromoCode = async (code, originalPrice) => {
         return {
             valid: true,
             code: cleanCode,
-            discount_type: data.discount_type,
-            discount_value: data.discount_value,
+            discount_type: promo.discount_type,
+            discount_value: promo.discount_value,
             discount_amount: discount,
             total_amount: total
         };
     } catch {
+        if (FALLBACK_PROMOS[cleanCode]) {
+            const promo = FALLBACK_PROMOS[cleanCode];
+            const discount = Math.round((originalPrice * promo.discount_value) / 100);
+            return {
+                valid: true,
+                code: cleanCode,
+                discount_type: promo.discount_type,
+                discount_value: promo.discount_value,
+                discount_amount: discount,
+                total_amount: originalPrice - discount
+            };
+        }
         return { valid: false, discount_amount: 0, total_amount: originalPrice, message: 'Gagal memverifikasi kode promo' };
     }
 };
