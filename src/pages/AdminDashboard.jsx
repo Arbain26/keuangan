@@ -7,7 +7,9 @@ import { scanReceiptImage } from '../utils/receiptScanner';
 import { 
     getUserSubscriptionStatus, 
     checkFeatureAccess, 
-    adminGrantPremium, 
+    adminGrantPremium,
+    adminConfirmPayment,
+    adminCancelPayment,
     fetchPlans, 
     fetchUsageLimits,
     DEFAULT_PLANS,
@@ -258,6 +260,8 @@ const AdminDashboard = () => {
         note: ''
     });
     const [limitModal, setLimitModal] = useState(null);
+    const [orderFilter, setOrderFilter] = useState('ALL'); // ALL | PENDING | PAID | CANCELLED | EXPIRED
+    const [isConfirmingOrder, setIsConfirmingOrder] = useState(null); // orderId being confirmed
 
     const handleReceiptPhotoUpload = async (e) => {
         const file = e.target.files[0];
@@ -370,6 +374,50 @@ const AdminDashboard = () => {
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.replace('/login');
+    };
+
+    // Admin: Confirm a PENDING order as PAID and activate subscription
+    const handleConfirmPayment = async (orderId) => {
+        if (!orderId) return;
+        if (!window.confirm(`Konfirmasi pembayaran untuk Order: ${orderId}?\nIni akan mengaktifkan Premium user secara langsung.`)) return;
+        setIsConfirmingOrder(orderId);
+        try {
+            await adminConfirmPayment(orderId);
+            showToast(`✅ Order ${orderId} dikonfirmasi sebagai PAID. Subscription user diaktifkan!`);
+            // Refresh orders list
+            if (supabase) {
+                const [subRes, orderRes] = await Promise.all([
+                    supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
+                    supabase.from('orders').select('*').order('created_at', { ascending: false })
+                ]);
+                if (subRes.data) setAllSubscriptions(subRes.data);
+                if (orderRes.data) setAllOrders(orderRes.data);
+            }
+        } catch (err) {
+            showToast(err.message || 'Gagal mengkonfirmasi pembayaran.', 'error');
+        } finally {
+            setIsConfirmingOrder(null);
+        }
+    };
+
+    // Admin: Reject/cancel a PENDING order
+    const handleCancelOrder = async (orderId) => {
+        if (!orderId) return;
+        const reason = window.prompt(`Alasan pembatalan order ${orderId}? (opsional)`) ?? '';
+        if (reason === null) return; // User pressed Cancel
+        setIsConfirmingOrder(orderId);
+        try {
+            await adminCancelPayment(orderId, reason);
+            showToast(`Order ${orderId} dibatalkan.`, 'error');
+            if (supabase) {
+                const orderRes = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+                if (orderRes.data) setAllOrders(orderRes.data);
+            }
+        } catch (err) {
+            showToast(err.message || 'Gagal membatalkan order.', 'error');
+        } finally {
+            setIsConfirmingOrder(null);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -1958,12 +2006,139 @@ const AdminDashboard = () => {
                                                      </tbody>
                                                  </table>
                                              </div>
-                                         </div>
-                                     </div>
-                                 )}
+                                          </div>
+
+                                          {/* ===== TRANSAKSI PEMBAYARAN ===== */}
+                                          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mt-6">
+                                              <div className="p-5 border-b border-gray-200">
+                                                  <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                                                      <ShoppingBag className="w-4 h-4 text-amber-500" />
+                                                      Transaksi Pembayaran ({allOrders.length})
+                                                  </h3>
+                                                  <p className="text-xs text-gray-400 mt-0.5">
+                                                      Konfirmasi pembayaran transfer manual dari pengguna. Tombol konfirmasi hanya muncul untuk order PENDING.
+                                                  </p>
+                                                  {/* Filter Tabs */}
+                                                  <div className="flex gap-2 mt-3 flex-wrap">
+                                                      {['ALL', 'PENDING', 'PAID', 'CANCELLED', 'EXPIRED'].map(f => (
+                                                          <button
+                                                              key={f}
+                                                              onClick={() => setOrderFilter(f)}
+                                                              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
+                                                                  orderFilter === f
+                                                                      ? f === 'PENDING' ? 'bg-amber-500 text-white' :
+                                                                        f === 'PAID' ? 'bg-green-500 text-white' :
+                                                                        f === 'CANCELLED' ? 'bg-red-500 text-white' :
+                                                                        f === 'EXPIRED' ? 'bg-gray-500 text-white' :
+                                                                        'bg-gray-900 text-white'
+                                                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                              }`}
+                                                          >
+                                                              {f} {f === 'PENDING' && allOrders.filter(o => o.status === 'PENDING').length > 0 && (
+                                                                  <span className="ml-1 bg-white/30 rounded-full px-1.5">{allOrders.filter(o => o.status === 'PENDING').length}</span>
+                                                              )}
+                                                          </button>
+                                                      ))}
+                                                  </div>
+                                              </div>
+                                              <div className="overflow-x-auto">
+                                                  <table className="w-full text-left text-xs text-gray-700 min-w-[900px]">
+                                                      <thead className="bg-gray-50 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-500">
+                                                          <tr>
+                                                              <th className="py-3.5 px-4">Order ID</th>
+                                                              <th className="py-3.5 px-4">User ID</th>
+                                                              <th className="py-3.5 px-4">Paket</th>
+                                                              <th className="py-3.5 px-4">Metode</th>
+                                                              <th className="py-3.5 px-4">Total</th>
+                                                              <th className="py-3.5 px-4">Status</th>
+                                                              <th className="py-3.5 px-4">Tanggal</th>
+                                                              <th className="py-3.5 px-4 text-center">Aksi Admin</th>
+                                                          </tr>
+                                                      </thead>
+                                                      <tbody className="divide-y divide-gray-100 font-medium">
+                                                          {(orderFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === orderFilter)).length === 0 ? (
+                                                              <tr>
+                                                                  <td colSpan="8" className="py-8 text-center text-gray-400">
+                                                                      {allOrders.length === 0
+                                                                          ? 'Belum ada data transaksi. Pastikan SQL schema sudah dijalankan di Supabase.'
+                                                                          : `Tidak ada transaksi dengan status ${orderFilter}.`}
+                                                                  </td>
+                                                              </tr>
+                                                          ) : (
+                                                              (orderFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === orderFilter)).map((order) => (
+                                                                  <tr key={order.order_id} className={`hover:bg-gray-50/50 transition ${order.status === 'PENDING' ? 'bg-amber-50/30' : ''}`}>
+                                                                      <td className="py-3 px-4 font-mono text-[11px] font-bold text-gray-900">
+                                                                          {order.order_id}
+                                                                      </td>
+                                                                      <td className="py-3 px-4 font-mono text-[11px] text-gray-500">
+                                                                          {order.user_id?.substring(0, 12)}...
+                                                                      </td>
+                                                                      <td className="py-3 px-4 font-bold text-blue-700">
+                                                                          {order.plan_code === 'PREMIUM_MONTHLY' ? '1 Bulan' :
+                                                                           order.plan_code === 'PREMIUM_YEARLY' ? '1 Tahun' :
+                                                                           order.plan_code === 'PREMIUM_LIFETIME' ? 'Unlimited' : order.plan_code}
+                                                                      </td>
+                                                                      <td className="py-3 px-4 text-gray-600">
+                                                                          {order.payment_method}
+                                                                          {order.promo_code && <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 rounded font-bold">{order.promo_code}</span>}
+                                                                      </td>
+                                                                      <td className="py-3 px-4 font-bold text-gray-900">
+                                                                          {formatCurrency(order.total_amount)}
+                                                                      </td>
+                                                                      <td className="py-3 px-4">
+                                                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                                              order.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                                                                              order.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
+                                                                              order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                                                              'bg-gray-100 text-gray-700'
+                                                                          }`}>
+                                                                              {order.status}
+                                                                          </span>
+                                                                      </td>
+                                                                      <td className="py-3 px-4 text-gray-500 text-[11px]">
+                                                                          {order.created_at ? new Date(order.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-'}
+                                                                      </td>
+                                                                      <td className="py-3 px-4 text-center">
+                                                                          {order.status === 'PENDING' ? (
+                                                                              <div className="flex gap-1.5 justify-center">
+                                                                                  <button
+                                                                                      onClick={() => handleConfirmPayment(order.order_id)}
+                                                                                      disabled={isConfirmingOrder === order.order_id}
+                                                                                      className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] font-bold transition disabled:opacity-50 flex items-center gap-1"
+                                                                                  >
+                                                                                      {isConfirmingOrder === order.order_id ? (
+                                                                                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                                                      ) : (
+                                                                                          <CheckCircle2 className="w-3 h-3" />
+                                                                                      )}
+                                                                                      Konfirmasi PAID
+                                                                                  </button>
+                                                                                  <button
+                                                                                      onClick={() => handleCancelOrder(order.order_id)}
+                                                                                      disabled={isConfirmingOrder === order.order_id}
+                                                                                      className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-[11px] font-bold transition disabled:opacity-50 flex items-center gap-1"
+                                                                                  >
+                                                                                      <X className="w-3 h-3" />
+                                                                                      Tolak
+                                                                                  </button>
+                                                                              </div>
+                                                                          ) : (
+                                                                              <span className="text-gray-300 text-[11px]">—</span>
+                                                                          )}
+                                                                      </td>
+                                                                  </tr>
+                                                              ))
+                                                          )}
+                                                      </tbody>
+                                                  </table>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  )}
+
                                      </motion.div>
                                  </AnimatePresence>
-                            </>
+                             </>
                         )}
                     </div>
                 </main>

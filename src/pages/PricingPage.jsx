@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { 
@@ -6,7 +6,7 @@ import {
     getUserSubscriptionStatus, 
     verifyPromoCode, 
     createCheckoutOrder, 
-    processOrderPayment, 
+    checkPaymentStatus,
     DEFAULT_PLANS 
 } from '../utils/subscriptionEngine';
 import { formatCurrency } from '../utils/format';
@@ -30,8 +30,13 @@ const PricingPage = () => {
     const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('QRIS');
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-    const [checkoutSuccess, setCheckoutSuccess] = useState(null);
+    
+    // Payment flow state
+    const [pendingOrder, setPendingOrder] = useState(null);   // Created PENDING order
+    const [paymentConfirmed, setPaymentConfirmed] = useState(false); // PAID confirmed
+    const [isCheckingStatus, setIsCheckingStatus] = useState(false);
     const [copiedField, setCopiedField] = useState('');
+    const [countdown, setCountdown] = useState(null); // seconds remaining
 
     const handleCopyText = (text, fieldName) => {
         navigator.clipboard.writeText(text);
@@ -39,15 +44,47 @@ const PricingPage = () => {
         setTimeout(() => setCopiedField(''), 2500);
     };
 
+    // Countdown timer for pending orders
+    useEffect(() => {
+        if (!pendingOrder?.expired_at) return;
+        const tick = () => {
+            const secs = Math.max(0, Math.floor((new Date(pendingOrder.expired_at) - Date.now()) / 1000));
+            setCountdown(secs);
+        };
+        tick();
+        const interval = setInterval(tick, 1000);
+        return () => clearInterval(interval);
+    }, [pendingOrder]);
+
+    // Polling: check payment status every 5 seconds while pendingOrder exists
+    useEffect(() => {
+        if (!pendingOrder?.order_id || paymentConfirmed) return;
+        const poll = setInterval(async () => {
+            try {
+                const status = await checkPaymentStatus(pendingOrder.order_id);
+                if (status?.status === 'PAID') {
+                    setPaymentConfirmed(true);
+                    // Refresh user subscription
+                    if (user) {
+                        const updatedSub = await getUserSubscriptionStatus(user.id);
+                        setUserSub(updatedSub);
+                    }
+                    clearInterval(poll);
+                } else if (status?.status === 'CANCELLED' || status?.status === 'EXPIRED') {
+                    setPendingOrder(prev => ({ ...prev, status: status.status }));
+                    clearInterval(poll);
+                }
+            } catch {}
+        }, 5000);
+        return () => clearInterval(poll);
+    }, [pendingOrder, paymentConfirmed, user]);
+
     useEffect(() => {
         const loadInitialData = async () => {
             setLoading(true);
             try {
-                // Fetch plans from DB
                 const planData = await fetchPlans();
                 setPlans(planData);
-
-                // Fetch current user session
                 if (supabase) {
                     const { data: { user: currentUser } } = await supabase.auth.getUser();
                     setUser(currentUser);
@@ -62,29 +99,26 @@ const PricingPage = () => {
                 setLoading(false);
             }
         };
-
         loadInitialData();
     }, []);
 
     const handleOpenCheckout = (plan) => {
         if (plan.code === 'FREE') return;
-
         if (!user) {
             navigate('/login?redirect=/pricing');
             return;
         }
-
         if (userSub && userSub.plan_code === 'PREMIUM_LIFETIME') {
             alert('Anda sudah memiliki Premium Unlimited.');
             return;
         }
-
         setSelectedPlan(plan);
         setPromoCodeInput('');
         setPromoResult(null);
         setPromoError('');
         setPaymentMethod('QRIS');
-        setCheckoutSuccess(null);
+        setPendingOrder(null);
+        setPaymentConfirmed(false);
     };
 
     const handleApplyPromo = async () => {
@@ -92,7 +126,6 @@ const PricingPage = () => {
         setIsVerifyingPromo(true);
         setPromoError('');
         setPromoResult(null);
-
         try {
             const res = await verifyPromoCode(promoCodeInput, selectedPlan.price);
             if (res.valid) {
@@ -107,38 +140,56 @@ const PricingPage = () => {
         }
     };
 
+    // âš ï¸ CRITICAL FIX: This ONLY creates a PENDING order.
+    // It does NOT activate Premium. Premium is activated only by Admin after verifying payment.
     const handlePayNow = async () => {
         if (!selectedPlan || !user) return;
-
         setIsProcessingPayment(true);
         try {
-            // 1. Create Checkout Order
             const order = await createCheckoutOrder({
                 userId: user.id,
                 planCode: selectedPlan.code,
                 paymentMethod,
                 promoCode: promoResult ? promoResult.code : null
             });
-
-            // 2. Process Simulated Payment Gateway Completion
-            const payRes = await processOrderPayment(order.order_id, order);
-
-            // 3. Update local user subscription state
-            const updatedSub = await getUserSubscriptionStatus(user.id);
-            setUserSub(updatedSub);
-
-            setCheckoutSuccess({
-                orderId: order.order_id,
-                totalPaid: order.total_amount,
-                planName: selectedPlan.name,
-                paymentMethod
-            });
+            // Order is now PENDING. Show waiting-for-payment screen.
+            setPendingOrder(order);
         } catch (err) {
-            console.error('Error completing payment:', err);
-            alert(err.message || 'Gagal memproses pembayaran.');
+            console.error('Error creating order:', err);
+            alert(err.message || 'Gagal membuat pesanan.');
         } finally {
             setIsProcessingPayment(false);
         }
+    };
+
+    const handleCheckStatus = async () => {
+        if (!pendingOrder?.order_id) return;
+        setIsCheckingStatus(true);
+        try {
+            const status = await checkPaymentStatus(pendingOrder.order_id);
+            if (status?.status === 'PAID') {
+                setPaymentConfirmed(true);
+                if (user) {
+                    const updatedSub = await getUserSubscriptionStatus(user.id);
+                    setUserSub(updatedSub);
+                }
+            } else {
+                setPendingOrder(prev => ({ ...prev, status: status?.status || prev.status }));
+                alert(`Status pembayaran: ${status?.status || 'PENDING'}. Mohon selesaikan pembayaran terlebih dahulu.`);
+            }
+        } catch {
+            alert('Gagal memeriksa status. Silakan coba lagi.');
+        } finally {
+            setIsCheckingStatus(false);
+        }
+    };
+
+    const formatCountdown = (secs) => {
+        if (!secs && secs !== 0) return '--:--:--';
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
     };
 
     // Helper: Calculate current plan status for buttons
@@ -428,7 +479,7 @@ const PricingPage = () => {
                                         : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 shadow-lg shadow-amber-500/25'
                                 }`}
                             >
-                                {isCurrentPlan('PREMIUM_LIFETIME') ? '✓ Anda Memiliki Unlimited' : 'Beli Sekarang'}
+                                {isCurrentPlan('PREMIUM_LIFETIME') ? 'âœ“ Anda Memiliki Unlimited' : 'Beli Sekarang'}
                             </button>
                         </div>
                     </div>
@@ -457,52 +508,52 @@ const PricingPage = () => {
                         <tbody className="divide-y divide-gray-100 text-xs text-gray-800">
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Dashboard</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Fitur dasar</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Batas penggunaan</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-red-500 font-bold">✕</td>
-                                <td className="text-center text-red-500 font-bold">✕</td>
-                                <td className="text-center text-red-500 font-bold">✕</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-red-500 font-bold">âœ•</td>
+                                <td className="text-center text-red-500 font-bold">âœ•</td>
+                                <td className="text-center text-red-500 font-bold">âœ•</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Fitur Premium</td>
-                                <td className="text-center text-red-500 font-bold">✕</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-red-500 font-bold">âœ•</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Analisis lanjutan</td>
                                 <td className="text-center text-amber-600 font-semibold">Terbatas</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Export</td>
                                 <td className="text-center text-amber-600 font-semibold">Terbatas</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Semua fitur</td>
-                                <td className="text-center text-red-500 font-bold">✕</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
-                                <td className="text-center text-green-600 font-bold">✓</td>
+                                <td className="text-center text-red-500 font-bold">âœ•</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center text-green-600 font-bold">âœ“</td>
                             </tr>
                             <tr className="bg-gray-50/50">
                                 <td className="py-3.5 px-6 font-bold text-gray-900">Masa aktif</td>
@@ -519,57 +570,178 @@ const PricingPage = () => {
             {/* Checkout & Payment Gateway Modal */}
             {selectedPlan && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl relative border border-gray-100 overflow-hidden">
-                        <button
-                            onClick={() => setSelectedPlan(null)}
-                            className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition p-1 rounded-full"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl relative border border-gray-100 overflow-y-auto max-h-[95vh]">
+                        {/* Close button - only show if not in pending waiting state */}
+                        {!pendingOrder && (
+                            <button
+                                onClick={() => setSelectedPlan(null)}
+                                className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition p-1 rounded-full"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        )}
 
-                        {checkoutSuccess ? (
-                            /* Success Order View */
+                        {/* === VIEW 3: PAYMENT CONFIRMED SUCCESS === */}
+                        {paymentConfirmed ? (
                             <div className="text-center py-6">
-                                <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <CheckCircle2 className="w-10 h-10" />
+                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
+                                    <CheckCircle2 className="w-12 h-12" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Berhasil!</h3>
-                                <p className="text-gray-600 text-xs mb-6">
-                                    Paket <strong>{checkoutSuccess.planName}</strong> telah aktif pada akun Anda.
+                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Dikonfirmasi! ðŸŽ‰</h3>
+                                <p className="text-gray-500 text-sm mb-6">
+                                    Paket <strong className="text-blue-600">{selectedPlan.name}</strong> telah aktif pada akun Anda.
+                                    Nikmati akses Premium tanpa batas!
                                 </p>
-
-                                <div className="bg-gray-50 rounded-2xl p-4 text-xs space-y-2 mb-6 text-left border border-gray-200">
+                                <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-xs space-y-2 mb-6 text-left">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Order ID</span>
-                                        <span className="font-mono font-bold text-gray-900">{checkoutSuccess.orderId}</span>
+                                        <span className="font-mono font-bold text-gray-900">{pendingOrder?.order_id}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Metode Pembayaran</span>
-                                        <span className="font-bold text-gray-900">{checkoutSuccess.paymentMethod}</span>
+                                        <span>Paket</span>
+                                        <span className="font-bold text-gray-900">{selectedPlan.name}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
                                         <span>Total Dibayar</span>
-                                        <span className="font-bold text-green-600">{formatCurrency(checkoutSuccess.totalPaid)}</span>
+                                        <span className="font-bold text-green-600">{formatCurrency(pendingOrder?.total_amount)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Status</span>
+                                        <span className="font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-md">âœ… PAID</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => { setSelectedPlan(null); navigate('/'); }}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition shadow-md"
+                                >
+                                    Ke Dashboard Utama
+                                </button>
+                            </div>
+
+                        /* === VIEW 2: WAITING FOR PAYMENT (PENDING) === */
+                        ) : pendingOrder ? (
+                            <div>
+                                <div className="text-center mb-6">
+                                    <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <AlertCircle className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-gray-900">Menunggu Pembayaran</h3>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Selesaikan transfer, lalu akun Anda akan diaktifkan oleh admin (biasanya dalam 1-24 jam).
+                                    </p>
+                                </div>
+
+                                {/* Order Summary */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-xs space-y-2">
+                                    <div className="flex justify-between text-gray-700">
+                                        <span className="font-medium">Order ID</span>
+                                        <span className="font-mono font-bold text-gray-900 flex items-center gap-2">
+                                            {pendingOrder.order_id}
+                                            <button onClick={() => handleCopyText(pendingOrder.order_id, 'orderid')} className="text-amber-600 hover:text-amber-700">
+                                                <Copy className="w-3 h-3" />
+                                            </button>
+                                            {copiedField === 'orderid' && <span className="text-green-600 text-[10px]">Tersalin!</span>}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-700">
+                                        <span className="font-medium">Paket</span>
+                                        <span className="font-bold text-gray-900">{selectedPlan.name}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-700">
+                                        <span className="font-medium">Metode</span>
+                                        <span className="font-bold text-gray-900">{pendingOrder.payment_method}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-amber-200 pt-2 text-gray-900">
+                                        <span className="font-bold">Total Transfer</span>
+                                        <span className="font-extrabold text-amber-700 text-sm">{formatCurrency(pendingOrder.total_amount)}</span>
                                     </div>
                                 </div>
 
+                                {/* Payment destination info */}
+                                <div className="space-y-3 mb-4">
+                                    {(pendingOrder.payment_method === 'E-Wallet' || pendingOrder.payment_method === 'QRIS') && (
+                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs">
+                                            <p className="font-bold text-emerald-900 mb-2 flex items-center"><Wallet className="w-3.5 h-3.5 mr-1" /> E-Wallet (DANA / GoPay)</p>
+                                            <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-emerald-100">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400">Nomor Tujuan â€” a.n. Muhammad Arbain</p>
+                                                    <p className="font-mono font-extrabold text-emerald-900">082215322757</p>
+                                                </div>
+                                                <button onClick={() => handleCopyText('082215322757', 'ewallet2')} className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition">
+                                                    <Copy className="w-3 h-3" /> {copiedField === 'ewallet2' ? 'Tersalin!' : 'Salin'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(pendingOrder.payment_method === 'Virtual Account' || pendingOrder.payment_method === 'QRIS') && (
+                                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs">
+                                            <p className="font-bold text-purple-900 mb-2 flex items-center"><Building2 className="w-3.5 h-3.5 mr-1" /> Transfer Bank BRI</p>
+                                            <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-purple-100">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400">No. Rekening â€” a.n. Muhammad Arbain</p>
+                                                    <p className="font-mono font-extrabold text-purple-900">362901036404538</p>
+                                                </div>
+                                                <button onClick={() => handleCopyText('362901036404538', 'bri2')} className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-lg transition">
+                                                    <Copy className="w-3 h-3" /> {copiedField === 'bri2' ? 'Tersalin!' : 'Salin'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Instructions */}
+                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600 mb-4 space-y-1">
+                                    <p className="font-bold text-gray-800 mb-1">ðŸ“‹ Langkah selanjutnya:</p>
+                                    <p>1ï¸âƒ£ Transfer <strong>{formatCurrency(pendingOrder.total_amount)}</strong> ke rekening/ewallet di atas</p>
+                                    <p>2ï¸âƒ£ Cantumkan Order ID: <strong className="font-mono">{pendingOrder.order_id}</strong> sebagai keterangan transfer (jika ada kolom keterangan)</p>
+                                    <p>3ï¸âƒ£ Setelah transfer, tunggu konfirmasi admin (1â€“24 jam kerja)</p>
+                                    <p>4ï¸âƒ£ Status akan otomatis berubah menjadi âœ… AKTIF</p>
+                                </div>
+
+                                {/* Countdown */}
+                                {countdown !== null && countdown > 0 && (
+                                    <div className="text-center text-xs text-gray-500 mb-4">
+                                        <span className="bg-gray-100 rounded-lg px-3 py-1 font-mono font-bold text-gray-700">
+                                            â± Order berlaku: {formatCountdown(countdown)}
+                                        </span>
+                                    </div>
+                                )}
+                                {countdown === 0 && (
+                                    <div className="text-center text-xs text-red-600 font-bold mb-4 bg-red-50 rounded-lg px-3 py-2">
+                                        âš ï¸ Order telah kedaluwarsa (24 jam). Buat order baru jika ingin melanjutkan.
+                                    </div>
+                                )}
+
+                                {/* Status indicator - auto polling */}
+                                <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-4">
+                                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+                                    Memeriksa status otomatis setiap 5 detik...
+                                </div>
+
+                                {/* Buttons */}
                                 <div className="flex gap-3">
                                     <button
-                                        onClick={() => navigate('/my-orders')}
-                                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs transition"
+                                        onClick={() => setSelectedPlan(null)}
+                                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition"
                                     >
-                                        Riwayat Pesanan
+                                        Tutup
                                     </button>
                                     <button
-                                        onClick={() => navigate('/admin')}
-                                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition shadow-md"
+                                        onClick={handleCheckStatus}
+                                        disabled={isCheckingStatus}
+                                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center justify-center gap-2 disabled:opacity-60"
                                     >
-                                        Ke Dashboard
+                                        {isCheckingStatus ? (
+                                            <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Memeriksa...</>
+                                        ) : (
+                                            <><Shield className="w-3.5 h-3.5" /> Cek Status Pembayaran</>
+                                        )}
                                     </button>
                                 </div>
                             </div>
+
+                        /* === VIEW 1: CHECKOUT FORM === */
                         ) : (
-                            /* Checkout Form View */
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-1">Checkout Pembayaran</h3>
                                 <p className="text-xs text-gray-500 mb-6">Selesaikan pembayaran untuk mengaktifkan paket Premium</p>
@@ -733,8 +905,8 @@ const PricingPage = () => {
                                             <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm mt-2 space-y-2">
                                                 <div className="flex justify-between items-center">
                                                     <div>
-                                                        <div className="text-[10px] text-gray-500 font-medium">Nomor Tujuan E-Wallet / Rekening</div>
-                                                        <div className="font-mono text-sm font-extrabold text-blue-950">082215322757 (DANA/GoPay)</div>
+                                                        <div className="text-[10px] text-gray-500 font-medium">E-Wallet (DANA/GoPay)</div>
+                                                        <div className="font-mono text-sm font-extrabold text-blue-950">082215322757</div>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -745,9 +917,20 @@ const PricingPage = () => {
                                                         {copiedField === 'qris' ? 'Tersalin!' : 'Salin'}
                                                     </button>
                                                 </div>
-                                                <p className="text-[11px] text-gray-500 italic pt-1 border-t border-gray-100">
-                                                    Silakan transfer sesuai nominal di bawah, lalu klik <strong>Bayar Sekarang</strong>. Paket akan aktif otomatis!
-                                                </p>
+                                                <div className="flex justify-between items-center border-t border-blue-100 pt-2">
+                                                    <div>
+                                                        <div className="text-[10px] text-gray-500 font-medium">Rekening BRI</div>
+                                                        <div className="font-mono text-sm font-extrabold text-blue-950">362901036404538</div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyText('362901036404538', 'qris-bri')}
+                                                        className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition"
+                                                    >
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        {copiedField === 'qris-bri' ? 'Tersalin!' : 'Salin'}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -773,21 +956,30 @@ const PricingPage = () => {
                                     </div>
                                 </div>
 
+                                {/* Warning Banner */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 mb-4 flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                                    <span>
+                                        <strong>Penting:</strong> Klik &quot;Buat Pesanan&quot; untuk mendapatkan Order ID, lalu transfer ke rekening/ewallet di atas.
+                                        Akses Premium akan aktif setelah admin memverifikasi pembayaran Anda (1â€“24 jam).
+                                    </span>
+                                </div>
+
                                 {/* Pay Button */}
                                 <button
                                     onClick={handlePayNow}
                                     disabled={isProcessingPayment}
-                                    className="w-full py-4 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white transition shadow-lg shadow-blue-600/25 flex items-center justify-center active:scale-95 disabled:opacity-50"
+                                    className="w-full py-4 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-700 text-white transition shadow-lg shadow-blue-600/25 flex items-center justify-center active:scale-95 disabled:opacity-50"
                                 >
                                     {isProcessingPayment ? (
                                         <span className="flex items-center">
                                             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                                            Memproses Pembayaran...
+                                            Membuat Pesanan...
                                         </span>
                                     ) : (
                                         <span className="flex items-center">
                                             <Lock className="w-4 h-4 mr-2" />
-                                            Bayar Sekarang ({formatCurrency(promoResult ? promoResult.total_amount : selectedPlan.price)})
+                                            Buat Pesanan ({formatCurrency(promoResult ? promoResult.total_amount : selectedPlan.price)})
                                         </span>
                                     )}
                                 </button>
@@ -800,4 +992,6 @@ const PricingPage = () => {
     );
 };
 
+
 export default PricingPage;
+

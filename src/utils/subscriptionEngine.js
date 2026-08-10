@@ -324,6 +324,9 @@ export const verifyPromoCode = async (code, originalPrice) => {
 };
 
 // 7. Create Subscription Checkout Order
+// ⚠️ IMPORTANT: This function ONLY creates a PENDING order.
+// It NEVER activates Premium or changes subscription status.
+// Premium is only activated by adminConfirmPayment() after manual verification.
 export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, promoCode }) => {
     const plans = await fetchPlans();
     const targetPlan = plans.find(p => p.code === planCode);
@@ -341,6 +344,9 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
     const promoRes = await verifyPromoCode(promoCode, targetPlan.price);
     const orderId = 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
+    // Payment expired at 24 hours from now
+    const expiredAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     const orderData = {
         order_id: orderId,
         user_id: userId,
@@ -350,7 +356,8 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
         discount_amount: promoRes.discount_amount || 0,
         total_amount: promoRes.total_amount,
         payment_method: paymentMethod || 'QRIS',
-        status: 'PENDING',
+        status: 'PENDING',  // ← Always PENDING. Never PAID here.
+        expired_at: expiredAt,
         created_at: new Date().toISOString()
     };
 
@@ -358,98 +365,125 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
         const { error } = await supabase.from('orders').insert([orderData]);
         if (error) {
             console.error('Error inserting order:', error);
+            // Still return orderData for localStorage fallback
         }
     }
+
+    // Save to local orders cache (status PENDING only)
+    try {
+        const localOrdersStr = localStorage.getItem('local_user_orders') || '[]';
+        const localOrders = JSON.parse(localOrdersStr);
+        localOrders.unshift(orderData);
+        localStorage.setItem('local_user_orders', JSON.stringify(localOrders.slice(0, 50)));
+    } catch {}
 
     return orderData;
 };
 
-// 8. Process Order Payment Completion
-export const processOrderPayment = async (orderId, passedOrderObj) => {
-    try {
-        let order = passedOrderObj;
+// 7b. Check Payment Status (for frontend polling)
+// Returns current status of an order from database.
+// Frontend polls this every 3-5 seconds to detect when Admin confirms payment.
+export const checkPaymentStatus = async (orderId) => {
+    if (!orderId) return null;
 
-        if (supabase && orderId) {
+    if (supabase) {
+        try {
             const { data, error } = await supabase
                 .from('orders')
-                .select('*')
+                .select('order_id, status, plan_code, total_amount, payment_method, paid_at, expired_at, created_at')
                 .eq('order_id', orderId)
                 .maybeSingle();
 
-            if (!error && data) {
-                order = data;
-                // Mark Order as PAID in DB
-                await supabase
-                    .from('orders')
-                    .update({ status: 'PAID' })
-                    .eq('order_id', orderId);
-            }
-        }
-
-        if (!order) {
-            throw new Error('Order tidak ditemukan');
-        }
-
-        order.status = 'PAID';
-
-        // Update local order cache
-        try {
-            const localOrdersStr = localStorage.getItem('local_user_orders') || '[]';
-            const localOrders = JSON.parse(localOrdersStr);
-            const existingIdx = localOrders.findIndex(o => o.order_id === orderId);
-            if (existingIdx >= 0) {
-                localOrders[existingIdx] = order;
-            } else {
-                localOrders.unshift(order);
-            }
-            localStorage.setItem('local_user_orders', JSON.stringify(localOrders));
+            if (!error && data) return data;
         } catch {}
-
-        // Fetch current sub & calculate new subscription dates
-        const currentSub = await getUserSubscriptionStatus(order.user_id);
-        const newDates = calculateRenewalDates(currentSub, order.plan_code);
-
-        const subPayload = {
-            user_id: order.user_id,
-            plan_code: order.plan_code,
-            subscription_status: 'ACTIVE',
-            subscription_start: newDates.subscription_start,
-            subscription_end: newDates.subscription_end,
-            source: order.source || 'PAID',
-            updated_at: new Date().toISOString()
-        };
-
-        if (supabase) {
-            try {
-                const { data: existingSub } = await supabase
-                    .from('user_subscriptions')
-                    .select('id')
-                    .eq('user_id', order.user_id)
-                    .maybeSingle();
-
-                if (existingSub) {
-                    await supabase
-                        .from('user_subscriptions')
-                        .update(subPayload)
-                        .eq('id', existingSub.id);
-                } else {
-                    await supabase
-                        .from('user_subscriptions')
-                        .insert([subPayload]);
-                }
-            } catch (dbErr) {
-                console.warn('Supabase DB sub update warning:', dbErr);
-            }
-        }
-
-        // Save local backup as well
-        localStorage.setItem(`local_sub_${order.user_id}`, JSON.stringify(subPayload));
-
-        return { success: true, order, subPayload };
-    } catch (err) {
-        console.error('Error processing order payment:', err);
-        throw err;
     }
+
+    // Fallback: check localStorage
+    try {
+        const localOrdersStr = localStorage.getItem('local_user_orders') || '[]';
+        const localOrders = JSON.parse(localOrdersStr);
+        return localOrders.find(o => o.order_id === orderId) || null;
+    } catch {
+        return null;
+    }
+};
+
+// 8. Admin Confirm Payment (ADMIN-ONLY — called from Admin Dashboard after manual verification)
+// ⚠️ This function must NEVER be called from user-facing checkout UI.
+// It is only called when an admin manually confirms a transfer in the Admin Dashboard.
+export const adminConfirmPayment = async (orderId) => {
+    if (!orderId) throw new Error('Order ID diperlukan.');
+    if (!supabase) throw new Error('Database tidak tersedia.');
+
+    // Fetch order from DB
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+    if (orderError || !order) throw new Error('Order tidak ditemukan.');
+
+    // Idempotency: if already PAID, skip activation
+    if (order.status === 'PAID') {
+        return { success: true, message: 'Order sudah berstatus PAID sebelumnya.', alreadyPaid: true };
+    }
+
+    const now = new Date().toISOString();
+
+    // Mark Order as PAID
+    await supabase
+        .from('orders')
+        .update({ status: 'PAID', paid_at: now })
+        .eq('order_id', orderId);
+
+    // Activate subscription
+    const currentSub = await getUserSubscriptionStatus(order.user_id);
+    const newDates = calculateRenewalDates(currentSub, order.plan_code);
+
+    const subPayload = {
+        user_id: order.user_id,
+        plan_code: order.plan_code,
+        subscription_status: 'ACTIVE',
+        subscription_start: newDates.subscription_start,
+        subscription_end: newDates.subscription_end,
+        source: 'PAID',
+        updated_at: now
+    };
+
+    const { data: existingSub } = await supabase
+        .from('user_subscriptions')
+        .select('id')
+        .eq('user_id', order.user_id)
+        .maybeSingle();
+
+    if (existingSub) {
+        await supabase
+            .from('user_subscriptions')
+            .update(subPayload)
+            .eq('id', existingSub.id);
+    } else {
+        await supabase
+            .from('user_subscriptions')
+            .insert([subPayload]);
+    }
+
+    return { success: true, order: { ...order, status: 'PAID' }, subPayload };
+};
+
+// 8b. Admin Reject/Cancel Payment (ADMIN-ONLY)
+export const adminCancelPayment = async (orderId, reason = '') => {
+    if (!orderId) throw new Error('Order ID diperlukan.');
+    if (!supabase) throw new Error('Database tidak tersedia.');
+
+    const { error } = await supabase
+        .from('orders')
+        .update({ status: 'CANCELLED', notes: reason || 'Dibatalkan oleh admin' })
+        .eq('order_id', orderId)
+        .neq('status', 'PAID'); // Cannot cancel already PAID orders
+
+    if (error) throw new Error('Gagal membatalkan order.');
+    return { success: true };
 };
 
 // 9. Admin Grant Premium (Strictly 3 options: PREMIUM_MONTHLY, PREMIUM_YEARLY, PREMIUM_LIFETIME)

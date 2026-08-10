@@ -73,11 +73,20 @@ create table if not exists public.orders (
   total_amount numeric not null,
   payment_method text not null,
   status text not null check (status in ('PENDING', 'PAID', 'FAILED', 'EXPIRED', 'CANCELLED')) default 'PENDING',
+  paid_at timestamp with time zone,
+  expired_at timestamp with time zone,
+  notes text,
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
+-- Add columns to orders if they don't exist yet (for existing tables)
+alter table public.orders add column if not exists paid_at timestamp with time zone;
+alter table public.orders add column if not exists expired_at timestamp with time zone;
+alter table public.orders add column if not exists notes text;
+
 -- Index for user order history
 create index if not exists idx_orders_user_id on public.orders(user_id);
+
 
 -- 5. Create USAGE_LIMITS table for Free User configurable limits
 create table if not exists public.usage_limits (
