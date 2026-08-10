@@ -246,17 +246,20 @@ const AdminDashboard = () => {
             const scannedData = await scanReceiptImage(file, (msg) => setScanProgress(msg));
             
             if (scannedData.amount > 0) {
+                const finalDesc = (scannedData.description && scannedData.description !== 'Transaksi Struk' && scannedData.description.trim() !== '') 
+                    ? scannedData.description.trim().toLowerCase() 
+                    : '-';
                 const dataToSubmit = {
                     type: scannedData.type || 'pengeluaran',
                     amount: scannedData.amount,
                     date: scannedData.date || new Date().toISOString().split('T')[0],
                     category: normalizeCategory(scannedData.category || 'lainnya', scannedData.type || 'pengeluaran'),
-                    description: (scannedData.description || 'Transaksi Struk').trim().toLowerCase()
+                    description: finalDesc
                 };
                 await createTransaction(dataToSubmit);
                 const data = await fetchTransactions();
                 setTransactions(Array.isArray(data) ? data : []);
-                showToast(`Transaksi dari foto struk (Rp ${formatNumberInput(scannedData.amount)}) berhasil disimpan otomatis!`);
+                showToast(`Transaksi foto struk (Rp ${formatNumberInput(scannedData.amount)}) berhasil diunggah & disimpan otomatis!`);
             } else {
                 setFormData(prev => ({
                     ...prev,

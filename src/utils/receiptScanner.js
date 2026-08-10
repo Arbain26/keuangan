@@ -92,7 +92,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         const category = normalizeCategory(cleanText, type);
 
         // 5. Detect Description (Store/Merchant Name or Top line)
-        let description = '';
+        let description = '-';
         if (lines.length > 0) {
             // First non-numeric line usually contains store name
             const storeLine = lines.find(l => 
@@ -100,7 +100,9 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
                 l.length >= 3 && 
                 !/nota|receipt|struk|faktur|bill|invoice|selamat\s*datang/i.test(l)
             );
-            description = storeLine ? storeLine.substring(0, 60).trim() : 'Transaksi Struk';
+            if (storeLine) {
+                description = storeLine.substring(0, 60).trim();
+            }
         }
 
         return {
@@ -108,7 +110,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             date: dateStr,
             type,
             category: category || 'lainnya',
-            description: description || 'Transaksi Struk',
+            description: description || '-',
             rawText: cleanText
         };
     } catch (error) {
