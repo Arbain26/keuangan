@@ -112,31 +112,37 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             /\b(4g|5g|lte|volte|ge|wifi|3g)\b/i.test(l) ||           // Phone network indicators
             /^\d+$/.test(l) ||                                      // Pure numbers
             /^[^\w\s]+$/.test(l) ||                                 // Pure symbols
+            /[=:\\|<>{}[\]~*^]/.test(l) ||                          // OCR noise symbols
             /\b(total|disc|diskon|tunai|kembali|kembalian|ppn|dpp|tgl|tanggal|jam|kasir|member|kritik|saran|scan|qr|alamat|telp|faktur|nota|receipt|struk|selamat|terima|kASIR)\b/i.test(l);
+
+        const isGibberish = (l) => {
+            const lettersOnly = l.replace(/[^a-zA-Z]/g, '');
+            return lettersOnly.length < 3;
+        };
 
         // Extract Store Name (First valid non-ignored header line)
         let storeName = '';
-        const headerCandidate = lines.find(l => l.length >= 3 && !isIgnoredLine(l));
+        const headerCandidate = lines.find(l => l.length >= 3 && !isIgnoredLine(l) && !isGibberish(l));
         if (headerCandidate) {
-            const cleanedHeader = headerCandidate.replace(/[©®™|~*^\\<>{}[\]]/g, '').replace(/\s+/g, ' ').trim();
+            const cleanedHeader = headerCandidate.replace(/[^a-zA-Z0-9\s\-\.\/]/g, '').replace(/\s+/g, ' ').trim();
             if (cleanedHeader && cleanedHeader.length >= 3 && !isIgnoredLine(cleanedHeader)) {
                 storeName = cleanedHeader;
             }
         }
 
-        // Extract Itemized Purchased List
+        // Extract Itemized Purchased List (Food, Drinks, Groceries, Goods)
         const items = [];
         for (const line of lines) {
-            // Check if line looks like an item description
             if (
                 line.length >= 3 && 
-                /[a-zA-Z]{2,}/.test(line) && 
+                /[a-zA-Z]{3,}/.test(line) && 
                 !isIgnoredLine(line) &&
+                !isGibberish(line) &&
                 !/\b(disc|diskon)\b/i.test(line)
             ) {
-                // Clean quantity & price tail from item line (e.g. "TWISTKO XGG 70G 1 16,600" -> "TWISTKO XGG 70G")
+                // Clean quantity & price tail from item line (e.g. "POPMIE G INDBBQ 1 6,100" -> "POPMIE G INDBBQ")
                 let cleanItem = line
-                    .replace(/[©®™|~*^\\<>{}[\]]/g, '')
+                    .replace(/[^a-zA-Z0-9\s\-\.\/]/g, '')
                     .replace(/\s+\d+\s+[\d\.,\s]+$/, '')
                     .replace(/\s+[\d\.,]+$/, '')
                     .replace(/\s+/g, ' ')
@@ -147,7 +153,8 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
                     cleanItem.length >= 3 && 
                     cleanItem !== storeName && 
                     !items.includes(cleanItem) &&
-                    !isIgnoredLine(cleanItem)
+                    !isIgnoredLine(cleanItem) &&
+                    !isGibberish(cleanItem)
                 ) {
                     items.push(cleanItem);
                 }
@@ -165,7 +172,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             amount,
             date: dateStr,
             type,
-            category: category || 'lainnya',
+            category: category || 'makanan & minuman',
             description: description || '-',
             rawText: cleanText
         };

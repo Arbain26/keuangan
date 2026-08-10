@@ -277,8 +277,7 @@ const AdminDashboard = () => {
                     category: scannedData.category || '',
                     description: finalDesc
                 });
-                const isStd = CATEGORIES.some(cat => cat.id === (scannedData.category || '').toLowerCase());
-                setIsCustomCategory(!isStd && scannedData.category !== '');
+                setIsCustomCategory(false);
                 showToast('Foto nota dibaca. Silakan isi nominal & simpan.', 'error');
             }
         } catch (error) {
