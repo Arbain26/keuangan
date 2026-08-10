@@ -15,7 +15,13 @@ const lazyWithRetry = (componentImport) =>
     } catch (error) {
       if (!pageHasBeenReloaded) {
         sessionStorage.setItem('page_reloaded_for_chunk', 'true');
-        window.location.reload();
+        if ('caches' in window) {
+          try {
+            const keys = await caches.keys();
+            await Promise.all(keys.map(key => caches.delete(key)));
+          } catch {}
+        }
+        window.location.href = window.location.pathname + '?v=' + Date.now();
         return new Promise(() => {}); // Pause until reload
       }
       throw error;
