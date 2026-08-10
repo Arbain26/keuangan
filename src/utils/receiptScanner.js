@@ -91,22 +91,27 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         // 4. Detect Category
         const category = normalizeCategory(cleanText, type);
 
-        // 5. Detect Description (Store/Merchant Name) - ignoring phone status bar noise
+        // 5. Detect Description (Store/Merchant Name from receipt)
         let description = '-';
         if (lines.length > 0) {
-            const isStatusBarLine = (l) => 
+            const isIgnoredLine = (l) => 
                 /\b\d{1,2}[\.:]\d{2}\b/.test(l) ||            // Time format like 12.45 or 12:45
                 /%/.test(l) ||                                // Battery percentage like 49%
                 /\b(4g|5g|lte|volte|ge|wifi|3g)\b/i.test(l) || // Phone network indicators
                 /^\d+$/.test(l) ||                            // Pure numbers
+                /^[^\w\s]+$/.test(l) ||                       // Pure symbols
                 /nota|receipt|struk|faktur|bill|invoice|selamat\s*datang/i.test(l);
 
-            const storeLine = lines.find(l => l.length >= 3 && !isStatusBarLine(l));
+            const storeLine = lines.find(l => l.length >= 3 && !isIgnoredLine(l));
             if (storeLine) {
-                const cleanedStore = storeLine.substring(0, 60).trim();
-                // Ensure cleanedStore doesn't contain status bar noise
-                if (cleanedStore && !isStatusBarLine(cleanedStore)) {
-                    description = cleanedStore;
+                // Clean OCR symbols like ©, ®, |, etc. and extra whitespace
+                const cleanedStore = storeLine
+                    .replace(/[©®™|~*^\\<>{}[\]]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                
+                if (cleanedStore && cleanedStore.length >= 2 && !isIgnoredLine(cleanedStore)) {
+                    description = cleanedStore.substring(0, 60);
                 }
             }
         }
