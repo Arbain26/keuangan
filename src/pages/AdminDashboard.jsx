@@ -245,10 +245,12 @@ const AdminDashboard = () => {
         try {
             const scannedData = await scanReceiptImage(file, (msg) => setScanProgress(msg));
             
+            const isNoise = (str) => !str || str === 'Transaksi Struk' || /%/.test(str) || /\b\d{1,2}[\.:]\d{2}\b/.test(str) || /\b(4g|5g|lte|ge)\b/i.test(str);
+            const finalDesc = (!isNoise(scannedData.description) && scannedData.description.trim() !== '') 
+                ? scannedData.description.trim().toLowerCase() 
+                : '-';
+
             if (scannedData.amount > 0) {
-                const finalDesc = (scannedData.description && scannedData.description !== 'Transaksi Struk' && scannedData.description.trim() !== '') 
-                    ? scannedData.description.trim().toLowerCase() 
-                    : '-';
                 const dataToSubmit = {
                     type: scannedData.type || 'pengeluaran',
                     amount: scannedData.amount,
@@ -259,19 +261,26 @@ const AdminDashboard = () => {
                 await createTransaction(dataToSubmit);
                 const data = await fetchTransactions();
                 setTransactions(Array.isArray(data) ? data : []);
-                showToast(`Transaksi foto struk (Rp ${formatNumberInput(scannedData.amount)}) berhasil diunggah & disimpan otomatis!`);
+                setFormData({
+                    type: 'pengeluaran',
+                    category: '',
+                    amount: '',
+                    description: '',
+                    date: new Date().toISOString().split('T')[0]
+                });
+                setIsCustomCategory(false);
+                showToast(`Transaksi foto struk (Rp ${formatNumberInput(scannedData.amount)}) berhasil disimpan otomatis!`);
             } else {
-                setFormData(prev => ({
-                    ...prev,
+                setFormData({
                     type: scannedData.type || 'pengeluaran',
-                    amount: scannedData.amount ? formatNumberInput(scannedData.amount) : prev.amount,
-                    date: scannedData.date || prev.date,
-                    category: scannedData.category || prev.category,
-                    description: scannedData.description || prev.description
-                }));
+                    amount: scannedData.amount ? formatNumberInput(scannedData.amount) : '',
+                    date: scannedData.date || new Date().toISOString().split('T')[0],
+                    category: scannedData.category || '',
+                    description: finalDesc
+                });
                 const isStd = CATEGORIES.some(cat => cat.id === (scannedData.category || '').toLowerCase());
                 setIsCustomCategory(!isStd && scannedData.category !== '');
-                showToast('Foto nota berhasil dibaca. Silakan lengkapi nominal & simpan.', 'error');
+                showToast('Foto nota dibaca. Silakan isi nominal & simpan.', 'error');
             }
         } catch (error) {
             console.error('Error scanning receipt:', error);
