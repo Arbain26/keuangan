@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag, Crown, MessageCircle, Phone, RefreshCw, Users, ShieldCheck, Check, Ban } from 'lucide-react';
 import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
 import { scanReceiptImage } from '../utils/receiptScanner';
 import { 
@@ -10,11 +10,15 @@ import {
     adminGrantPremium,
     adminConfirmPayment,
     adminCancelPayment,
+    adminRevokePremium,
+    isSuperAdmin,
+    SUPER_ADMIN_EMAIL,
     fetchPlans, 
     fetchUsageLimits,
     DEFAULT_PLANS,
     DEFAULT_LIMITS 
 } from '../utils/subscriptionEngine';
+import { AdminSubscriptionCenter } from '../components/AdminSubscriptionCenter';
 import { Link } from 'react-router-dom';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import ExcelJS from 'exceljs';
@@ -253,15 +257,21 @@ const AdminDashboard = () => {
     const [plans, setPlans] = useState(DEFAULT_PLANS);
     const [allSubscriptions, setAllSubscriptions] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
+    const [userSearchTerm, setUserSearchTerm] = useState('');
+    const [userStatusFilter, setUserStatusFilter] = useState('ALL'); // ALL | ACTIVE | FREE | EXPIRED
     const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
     const [grantForm, setGrantForm] = useState({
         targetUserId: '',
+        targetUserEmail: '',
         planCode: 'PREMIUM_MONTHLY',
         note: ''
     });
     const [limitModal, setLimitModal] = useState(null);
     const [orderFilter, setOrderFilter] = useState('ALL'); // ALL | PENDING | PAID | CANCELLED | EXPIRED
     const [isConfirmingOrder, setIsConfirmingOrder] = useState(null); // orderId being confirmed
+
+    // Admin Utama status check
+    const isAdminUtama = isSuperAdmin(user);
 
     const handleReceiptPhotoUpload = async (e) => {
         const file = e.target.files[0];
@@ -355,14 +365,18 @@ const AdminDashboard = () => {
                 setUserSub(subStatus);
             }
 
-            // Fetch All Subscriptions & Orders for Admin Panel
-            if (supabase) {
+            // Fetch All Subscriptions & Orders EXCLUSIVELY for Admin Utama (arbain@gmail.com)
+            const isUserSuperAdmin = activeUser && isSuperAdmin(activeUser);
+            if (supabase && isUserSuperAdmin) {
                 const [subRes, orderRes] = await Promise.all([
                     supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
                     supabase.from('orders').select('*').order('created_at', { ascending: false })
                 ]);
                 if (subRes.data) setAllSubscriptions(subRes.data);
                 if (orderRes.data) setAllOrders(orderRes.data);
+            } else {
+                setAllSubscriptions([]);
+                setAllOrders([]);
             }
         } catch (error) {
             console.error('Error loading initial data:', error);
@@ -383,9 +397,9 @@ const AdminDashboard = () => {
         setIsConfirmingOrder(orderId);
         try {
             await adminConfirmPayment(orderId);
-            showToast(`✅ Order ${orderId} dikonfirmasi sebagai PAID. Subscription user diaktifkan!`);
-            // Refresh orders list
-            if (supabase) {
+            showToast(`✅ Order ${orderId} berhasil di-APPROVE sebagai PAID. Langganan user aktif!`);
+            // Refresh orders & subscriptions list for Super Admin
+            if (supabase && isSuperAdmin(user)) {
                 const [subRes, orderRes] = await Promise.all([
                     supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
                     supabase.from('orders').select('*').order('created_at', { ascending: false })
@@ -409,7 +423,7 @@ const AdminDashboard = () => {
         try {
             await adminCancelPayment(orderId, reason);
             showToast(`Order ${orderId} dibatalkan.`, 'error');
-            if (supabase) {
+            if (supabase && isSuperAdmin(user)) {
                 const orderRes = await supabase.from('orders').select('*').order('created_at', { ascending: false });
                 if (orderRes.data) setAllOrders(orderRes.data);
             }
@@ -417,6 +431,26 @@ const AdminDashboard = () => {
             showToast(err.message || 'Gagal membatalkan order.', 'error');
         } finally {
             setIsConfirmingOrder(null);
+        }
+    };
+
+    // Admin Utama: Revoke user subscription (revert to FREE)
+    const handleRevokePremium = async (userId, userEmail) => {
+        if (!userId) return;
+        const targetDisplay = userEmail || userId;
+        if (!window.confirm(`Yakin ingin mencabut status Premium untuk: ${targetDisplay}?\nPengguna ini akan dikembalikan ke paket FREE.`)) return;
+        setIsSubmitting(true);
+        try {
+            await adminRevokePremium(userId);
+            showToast(`Akses Premium untuk ${targetDisplay} telah dicabut.`);
+            if (supabase && isSuperAdmin(user)) {
+                const subRes = await supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false });
+                if (subRes.data) setAllSubscriptions(subRes.data);
+            }
+        } catch (err) {
+            showToast(err.message || 'Gagal mencabut status Premium.', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -1150,14 +1184,23 @@ const AdminDashboard = () => {
                         </span>
                     </div>
                     <div className="flex items-center gap-3 border-l border-gray-200 pl-4 h-8">
-                        <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100 text-xs font-bold text-blue-600">
-                            MA
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                            isAdminUtama ? 'bg-amber-100 border border-amber-300 text-amber-900 shadow-sm' : 'bg-blue-50 border border-blue-100 text-blue-600'
+                        }`}>
+                            {isAdminUtama ? <Crown className="w-4 h-4 text-amber-600" /> : 'MA'}
                         </div>
                         <div className="hidden md:block">
-                            <p className="text-xs font-bold text-gray-950 capitalize">{user?.user_metadata?.full_name || 'Muhammad Arbain'}</p>
-                            <p className="text-[10px] text-gray-500">Administrator</p>
+                            <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-gray-950 capitalize">{user?.user_metadata?.full_name || 'Muhammad Arbain'}</p>
+                                {isAdminUtama && (
+                                    <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 shadow-sm">
+                                        ★ ADMIN UTAMA
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-gray-500">{user?.email || 'Administrator'}</p>
                         </div>
-                        <button onClick={handleLogout} className="ml-2 p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                        <button onClick={handleLogout} className="ml-2 p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Keluar">
                             <LogOut className="w-4 h-4" />
                         </button>
                     </div>
@@ -1183,8 +1226,24 @@ const AdminDashboard = () => {
                             <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
                             <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" />
                             <SidebarItem id="reports" icon={FileText} label="Laporan" />
-                            {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
-                                <SidebarItem id="subscriptions" icon={Zap} label="Kelola Langganan" />
+                            {isAdminUtama && (
+                                <button
+                                    onClick={() => { setActiveTab('subscriptions'); setIsSidebarOpen(false); }}
+                                    className={`w-full text-left px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-between mb-1 ${activeTab === 'subscriptions'
+                                        ? 'bg-amber-50 text-amber-700 shadow-sm border-l-4 border-amber-500 font-bold'
+                                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Crown className={`w-5 h-5 ${activeTab === 'subscriptions' ? 'text-amber-500' : 'text-amber-500/80'}`} />
+                                        <span>Kelola Langganan</span>
+                                    </div>
+                                    {allOrders.filter(o => o.status === 'PENDING').length > 0 && (
+                                        <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+                                            {allOrders.filter(o => o.status === 'PENDING').length}
+                                        </span>
+                                    )}
+                                </button>
                             )}
 
                             <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Paket & Akun</p>
@@ -1247,7 +1306,7 @@ const AdminDashboard = () => {
                                             }[activeTab]}
                                         </p>
                                     </div>
-                                    {activeTab === 'subscriptions' && user?.email?.toLowerCase() === 'arbain@gmail.com' && (
+                                    {activeTab === 'subscriptions' && isAdminUtama && (
                                         <button
                                             onClick={() => setIsGrantModalOpen(true)}
                                             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-sm font-bold rounded-lg hover:from-amber-600 hover:to-amber-700 transition shadow-lg shadow-amber-500/20"
@@ -1867,274 +1926,32 @@ const AdminDashboard = () => {
                                  )}
 
                                  {activeTab === 'subscriptions' && (
-                                     <div className="space-y-8">
-                                         {/* Admin 11 Statistics Grid */}
-                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-gray-500 font-semibold mb-1">Total User</p>
-                                                 <h4 className="text-xl font-bold text-gray-900">{allSubscriptions.length || (user ? 1 : 0)}</h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-gray-500 font-semibold mb-1">Free User</p>
-                                                 <h4 className="text-xl font-bold text-gray-700">
-                                                     {allSubscriptions.filter(s => s.plan_code === 'FREE' || s.subscription_status === 'FREE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-blue-600 font-semibold mb-1">Premium User (Aktif)</p>
-                                                 <h4 className="text-xl font-bold text-blue-700">
-                                                     {allSubscriptions.filter(s => s.subscription_status === 'ACTIVE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-purple-600 font-semibold mb-1">Premium 1 Bulan</p>
-                                                 <h4 className="text-xl font-bold text-purple-700">
-                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_MONTHLY' && s.subscription_status === 'ACTIVE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-indigo-600 font-semibold mb-1">Premium 1 Tahun</p>
-                                                 <h4 className="text-xl font-bold text-indigo-700">
-                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_YEARLY' && s.subscription_status === 'ACTIVE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-amber-600 font-semibold mb-1">Premium Unlimited</p>
-                                                 <h4 className="text-xl font-bold text-amber-700">
-                                                     {allSubscriptions.filter(s => s.plan_code === 'PREMIUM_LIFETIME' && s.subscription_status === 'ACTIVE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-emerald-600 font-semibold mb-1">Paid Premium</p>
-                                                 <h4 className="text-xl font-bold text-emerald-700">
-                                                     {allSubscriptions.filter(s => s.source === 'PAID').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-teal-600 font-semibold mb-1">Admin Granted</p>
-                                                 <h4 className="text-xl font-bold text-teal-700">
-                                                     {allSubscriptions.filter(s => s.source === 'ADMIN_GRANTED').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-green-600 font-semibold mb-1">Active Subscription</p>
-                                                 <h4 className="text-xl font-bold text-green-700">
-                                                     {allSubscriptions.filter(s => s.subscription_status === 'ACTIVE').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
-                                                 <p className="text-xs text-rose-600 font-semibold mb-1">Expired Subscription</p>
-                                                 <h4 className="text-xl font-bold text-rose-700">
-                                                     {allSubscriptions.filter(s => s.subscription_status === 'EXPIRED').length}
-                                                 </h4>
-                                             </div>
-                                             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl p-4 col-span-2 shadow-sm">
-                                                 <p className="text-xs font-semibold text-blue-100 mb-1">Total Revenue (Pendapatan)</p>
-                                                 <h4 className="text-2xl font-black">
-                                                     {formatCurrency(allOrders.filter(o => o.status === 'PAID').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
-                                                 </h4>
-                                             </div>
-                                         </div>
-
-                                         {/* Admin User Subscriptions Table */}
-                                         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                                             <div className="p-5 border-b border-gray-200 flex justify-between items-center">
-                                                 <h3 className="font-bold text-gray-900 text-base">Daftar Langganan Pengguna</h3>
-                                                 <button
-                                                     onClick={() => {
-                                                         setGrantForm(prev => ({ ...prev, targetUserId: user ? user.id : '' }));
-                                                         setIsGrantModalOpen(true);
-                                                     }}
-                                                     className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-lg text-xs font-bold transition shadow-sm"
-                                                 >
-                                                     + Berikan Premium (Admin)
-                                                 </button>
-                                             </div>
-                                             <div className="overflow-x-auto">
-                                                 <table className="w-full text-left text-xs text-gray-700 min-w-[700px]">
-                                                     <thead className="bg-gray-50 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-500">
-                                                         <tr>
-                                                             <th className="py-3.5 px-6">User ID</th>
-                                                             <th className="py-3.5 px-4">Paket</th>
-                                                             <th className="py-3.5 px-4">Source</th>
-                                                             <th className="py-3.5 px-4">Status</th>
-                                                             <th className="py-3.5 px-4">Start Date</th>
-                                                             <th className="py-3.5 px-6 text-right">End Date</th>
-                                                         </tr>
-                                                     </thead>
-                                                     <tbody className="divide-y divide-gray-100 font-medium">
-                                                         {allSubscriptions.length === 0 ? (
-                                                             <tr>
-                                                                 <td colSpan="6" className="py-8 text-center text-gray-400">
-                                                                     Belum ada data langganan tersimpan di database.
-                                                                 </td>
-                                                             </tr>
-                                                         ) : (
-                                                             allSubscriptions.map((sub) => (
-                                                                 <tr key={sub.id} className="hover:bg-gray-50/50 transition">
-                                                                     <td className="py-3.5 px-6 font-mono text-gray-900 font-bold">
-                                                                         {sub.user_id?.substring(0, 18)}...
-                                                                     </td>
-                                                                     <td className="py-3.5 px-4 font-bold text-blue-700">
-                                                                         {sub.plan_code === 'PREMIUM_MONTHLY' ? 'Premium 1 Bulan' : sub.plan_code === 'PREMIUM_YEARLY' ? 'Premium 1 Tahun' : sub.plan_code === 'PREMIUM_LIFETIME' ? 'Premium Unlimited' : 'FREE'}
-                                                                     </td>
-                                                                     <td className="py-3.5 px-4">
-                                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${sub.source === 'ADMIN_GRANTED' ? 'bg-purple-100 text-purple-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                                             {sub.source || 'PAID'}
-                                                                         </span>
-                                                                     </td>
-                                                                     <td className="py-3.5 px-4">
-                                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${sub.subscription_status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                                                                             {sub.subscription_status}
-                                                                         </span>
-                                                                     </td>
-                                                                     <td className="py-3.5 px-4 font-mono text-[11px] text-gray-600">
-                                                                         {formatDate(sub.subscription_start)}
-                                                                     </td>
-                                                                     <td className="py-3.5 px-6 text-right font-mono text-[11px] font-bold text-gray-800">
-                                                                         {sub.plan_code === 'PREMIUM_LIFETIME' ? (
-                                                                             <span className="text-amber-600">Lifetime</span>
-                                                                         ) : sub.subscription_end ? (
-                                                                             formatDate(sub.subscription_end)
-                                                                         ) : (
-                                                                             '-'
-                                                                         )}
-                                                                     </td>
-                                                                 </tr>
-                                                             ))
-                                                         )}
-                                                     </tbody>
-                                                 </table>
-                                             </div>
-                                          </div>
-
-                                          {/* ===== TRANSAKSI PEMBAYARAN ===== */}
-                                          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm mt-6">
-                                              <div className="p-5 border-b border-gray-200">
-                                                  <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                                                      <ShoppingBag className="w-4 h-4 text-amber-500" />
-                                                      Transaksi Pembayaran ({allOrders.length})
-                                                  </h3>
-                                                  <p className="text-xs text-gray-400 mt-0.5">
-                                                      Konfirmasi pembayaran transfer manual dari pengguna. Tombol konfirmasi hanya muncul untuk order PENDING.
-                                                  </p>
-                                                  {/* Filter Tabs */}
-                                                  <div className="flex gap-2 mt-3 flex-wrap">
-                                                      {['ALL', 'PENDING', 'PAID', 'CANCELLED', 'EXPIRED'].map(f => (
-                                                          <button
-                                                              key={f}
-                                                              onClick={() => setOrderFilter(f)}
-                                                              className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
-                                                                  orderFilter === f
-                                                                      ? f === 'PENDING' ? 'bg-amber-500 text-white' :
-                                                                        f === 'PAID' ? 'bg-green-500 text-white' :
-                                                                        f === 'CANCELLED' ? 'bg-red-500 text-white' :
-                                                                        f === 'EXPIRED' ? 'bg-gray-500 text-white' :
-                                                                        'bg-gray-900 text-white'
-                                                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                              }`}
-                                                          >
-                                                              {f} {f === 'PENDING' && allOrders.filter(o => o.status === 'PENDING').length > 0 && (
-                                                                  <span className="ml-1 bg-white/30 rounded-full px-1.5">{allOrders.filter(o => o.status === 'PENDING').length}</span>
-                                                              )}
-                                                          </button>
-                                                      ))}
-                                                  </div>
-                                              </div>
-                                              <div className="overflow-x-auto">
-                                                  <table className="w-full text-left text-xs text-gray-700 min-w-[900px]">
-                                                      <thead className="bg-gray-50 border-b border-gray-200 font-bold uppercase tracking-wider text-gray-500">
-                                                          <tr>
-                                                              <th className="py-3.5 px-4">Order ID</th>
-                                                              <th className="py-3.5 px-4">User ID</th>
-                                                              <th className="py-3.5 px-4">Paket</th>
-                                                              <th className="py-3.5 px-4">Metode</th>
-                                                              <th className="py-3.5 px-4">Total</th>
-                                                              <th className="py-3.5 px-4">Status</th>
-                                                              <th className="py-3.5 px-4">Tanggal</th>
-                                                              <th className="py-3.5 px-4 text-center">Aksi Admin</th>
-                                                          </tr>
-                                                      </thead>
-                                                      <tbody className="divide-y divide-gray-100 font-medium">
-                                                          {(orderFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === orderFilter)).length === 0 ? (
-                                                              <tr>
-                                                                  <td colSpan="8" className="py-8 text-center text-gray-400">
-                                                                      {allOrders.length === 0
-                                                                          ? 'Belum ada data transaksi. Pastikan SQL schema sudah dijalankan di Supabase.'
-                                                                          : `Tidak ada transaksi dengan status ${orderFilter}.`}
-                                                                  </td>
-                                                              </tr>
-                                                          ) : (
-                                                              (orderFilter === 'ALL' ? allOrders : allOrders.filter(o => o.status === orderFilter)).map((order) => (
-                                                                  <tr key={order.order_id} className={`hover:bg-gray-50/50 transition ${order.status === 'PENDING' ? 'bg-amber-50/30' : ''}`}>
-                                                                      <td className="py-3 px-4 font-mono text-[11px] font-bold text-gray-900">
-                                                                          {order.order_id}
-                                                                      </td>
-                                                                      <td className="py-3 px-4 font-mono text-[11px] text-gray-500">
-                                                                          {order.user_id?.substring(0, 12)}...
-                                                                      </td>
-                                                                      <td className="py-3 px-4 font-bold text-blue-700">
-                                                                          {order.plan_code === 'PREMIUM_MONTHLY' ? '1 Bulan' :
-                                                                           order.plan_code === 'PREMIUM_YEARLY' ? '1 Tahun' :
-                                                                           order.plan_code === 'PREMIUM_LIFETIME' ? 'Unlimited' : order.plan_code}
-                                                                      </td>
-                                                                      <td className="py-3 px-4 text-gray-600">
-                                                                          {order.payment_method}
-                                                                          {order.promo_code && <span className="ml-1 text-[10px] bg-green-100 text-green-700 px-1.5 rounded font-bold">{order.promo_code}</span>}
-                                                                      </td>
-                                                                      <td className="py-3 px-4 font-bold text-gray-900">
-                                                                          {formatCurrency(order.total_amount)}
-                                                                      </td>
-                                                                      <td className="py-3 px-4">
-                                                                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                                              order.status === 'PAID' ? 'bg-green-100 text-green-800' :
-                                                                              order.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
-                                                                              order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
-                                                                              'bg-gray-100 text-gray-700'
-                                                                          }`}>
-                                                                              {order.status}
-                                                                          </span>
-                                                                      </td>
-                                                                      <td className="py-3 px-4 text-gray-500 text-[11px]">
-                                                                          {order.created_at ? new Date(order.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-'}
-                                                                      </td>
-                                                                      <td className="py-3 px-4 text-center">
-                                                                          {order.status === 'PENDING' ? (
-                                                                              <div className="flex gap-1.5 justify-center">
-                                                                                  <button
-                                                                                      onClick={() => handleConfirmPayment(order.order_id)}
-                                                                                      disabled={isConfirmingOrder === order.order_id}
-                                                                                      className="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] font-bold transition disabled:opacity-50 flex items-center gap-1"
-                                                                                  >
-                                                                                      {isConfirmingOrder === order.order_id ? (
-                                                                                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                                                      ) : (
-                                                                                          <CheckCircle2 className="w-3 h-3" />
-                                                                                      )}
-                                                                                      Konfirmasi PAID
-                                                                                  </button>
-                                                                                  <button
-                                                                                      onClick={() => handleCancelOrder(order.order_id)}
-                                                                                      disabled={isConfirmingOrder === order.order_id}
-                                                                                      className="px-2.5 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-[11px] font-bold transition disabled:opacity-50 flex items-center gap-1"
-                                                                                  >
-                                                                                      <X className="w-3 h-3" />
-                                                                                      Tolak
-                                                                                  </button>
-                                                                              </div>
-                                                                          ) : (
-                                                                              <span className="text-gray-300 text-[11px]">—</span>
-                                                                          )}
-                                                                      </td>
-                                                                  </tr>
-                                                              ))
-                                                          )}
-                                                      </tbody>
-                                                  </table>
-                                              </div>
-                                          </div>
-                                      </div>
-                                  )}
+                                     <AdminSubscriptionCenter
+                                         user={user}
+                                         isAdminUtama={isAdminUtama}
+                                         allSubscriptions={allSubscriptions}
+                                         allOrders={allOrders}
+                                         loading={loading}
+                                         onRefresh={loadInitialData}
+                                         onConfirmPayment={handleConfirmPayment}
+                                         onCancelOrder={handleCancelOrder}
+                                         onRevokePremium={handleRevokePremium}
+                                         onOpenGrantModal={(targetUser) => {
+                                             if (targetUser) {
+                                                 setGrantForm({
+                                                     targetUserId: targetUser.user_id || '',
+                                                     targetUserEmail: targetUser.user_email || '',
+                                                     planCode: targetUser.plan_code !== 'FREE' ? targetUser.plan_code : 'PREMIUM_MONTHLY',
+                                                     note: ''
+                                                 });
+                                             } else {
+                                                 setGrantForm({ targetUserId: '', targetUserEmail: '', planCode: 'PREMIUM_MONTHLY', note: '' });
+                                             }
+                                             setIsGrantModalOpen(true);
+                                         }}
+                                         isConfirmingOrder={isConfirmingOrder}
+                                     />
+                                 )}
 
                                      </motion.div>
                                  </AnimatePresence>

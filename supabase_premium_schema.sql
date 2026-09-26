@@ -79,10 +79,14 @@ create table if not exists public.orders (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- Add columns to orders if they don't exist yet (for existing tables)
+-- Add columns to orders & user_subscriptions if they don't exist yet (for existing tables)
+alter table public.orders add column if not exists user_email text;
+alter table public.orders add column if not exists customer_phone text;
+alter table public.orders add column if not exists proof_url text;
 alter table public.orders add column if not exists paid_at timestamp with time zone;
 alter table public.orders add column if not exists expired_at timestamp with time zone;
 alter table public.orders add column if not exists notes text;
+alter table public.user_subscriptions add column if not exists user_email text;
 
 -- Index for user order history
 create index if not exists idx_orders_user_id on public.orders(user_id);

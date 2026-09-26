@@ -1,5 +1,12 @@
 import { supabase } from '../lib/supabaseClient';
 
+export const SUPER_ADMIN_EMAIL = 'arbain@gmail.com';
+
+export const isSuperAdmin = (email) => {
+    if (!email) return false;
+    return email.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+};
+
 export const DEFAULT_PLANS = [
     {
         id: 'plan-free',
@@ -70,7 +77,19 @@ export const fetchUsageLimits = async () => {
 };
 
 // 3. Get User Subscription Status & Expiration Check
-export const getUserSubscriptionStatus = async (userId) => {
+export const getUserSubscriptionStatus = async (userId, userEmail = null) => {
+    // Super Admin Arbain always has active lifetime access
+    if (isSuperAdmin(userEmail)) {
+        return {
+            plan_code: 'PREMIUM_LIFETIME',
+            subscription_status: 'ACTIVE',
+            subscription_start: new Date(2024, 0, 1).toISOString(),
+            subscription_end: null,
+            source: 'ADMIN_GRANTED',
+            role: 'SUPER_ADMIN'
+        };
+    }
+
     if (!userId) {
         return {
             plan_code: 'FREE',
@@ -84,6 +103,23 @@ export const getUserSubscriptionStatus = async (userId) => {
         let subData = null;
 
         if (supabase) {
+            // Check auth user email if not supplied
+            if (!userEmail) {
+                try {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user && user.id === userId && isSuperAdmin(user.email)) {
+                        return {
+                            plan_code: 'PREMIUM_LIFETIME',
+                            subscription_status: 'ACTIVE',
+                            subscription_start: new Date(2024, 0, 1).toISOString(),
+                            subscription_end: null,
+                            source: 'ADMIN_GRANTED',
+                            role: 'SUPER_ADMIN'
+                        };
+                    }
+                } catch {}
+            }
+
             const { data, error } = await supabase
                 .from('user_subscriptions')
                 .select('*')
@@ -160,6 +196,16 @@ export const getUserSubscriptionStatus = async (userId) => {
 
 // 4. Central Authorization Access Check (checkFeatureAccess)
 export const checkFeatureAccess = async (user, featureType = 'transaction', currentUsageCount = 0) => {
+    // Super Admin Arbain has NO restrictions ever
+    if (user && isSuperAdmin(user.email)) {
+        return { 
+            allowed: true, 
+            isPremium: true, 
+            planCode: 'PREMIUM_LIFETIME', 
+            reason: 'SUPER_ADMIN' 
+        };
+    }
+
     const limits = await fetchUsageLimits();
     
     if (!user) {
@@ -180,7 +226,7 @@ export const checkFeatureAccess = async (user, featureType = 'transaction', curr
         };
     }
 
-    const sub = await getUserSubscriptionStatus(user.id);
+    const sub = await getUserSubscriptionStatus(user.id, user.email);
 
     // Lifetime Premium Check
     if (sub.plan_code === 'PREMIUM_LIFETIME' && sub.subscription_status !== 'CANCELLED') {
@@ -215,7 +261,7 @@ export const checkFeatureAccess = async (user, featureType = 'transaction', curr
 // 5. Renewal Date Accumulation Logic
 export const calculateRenewalDates = (currentSubscription, newPlanCode) => {
     if (currentSubscription && currentSubscription.plan_code === 'PREMIUM_LIFETIME') {
-        throw new Error('Anda sudah memiliki Premium Unlimited.');
+        throw new Error('Pengguna sudah memiliki Premium Unlimited.');
     }
 
     let baseDate = new Date();
@@ -327,7 +373,15 @@ export const verifyPromoCode = async (code, originalPrice) => {
 // ⚠️ IMPORTANT: This function ONLY creates a PENDING order.
 // It NEVER activates Premium or changes subscription status.
 // Premium is only activated by adminConfirmPayment() after manual verification.
-export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, promoCode }) => {
+export const createCheckoutOrder = async ({ 
+    userId, 
+    userEmail, 
+    planCode, 
+    paymentMethod = 'QRIS', 
+    promoCode, 
+    customerPhone = '', 
+    notes = '' 
+}) => {
     const plans = await fetchPlans();
     const targetPlan = plans.find(p => p.code === planCode);
     
@@ -336,7 +390,7 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
     }
 
     // Check if user already has Unlimited
-    const currentSub = await getUserSubscriptionStatus(userId);
+    const currentSub = await getUserSubscriptionStatus(userId, userEmail);
     if (currentSub && currentSub.plan_code === 'PREMIUM_LIFETIME') {
         throw new Error('Anda sudah memiliki Premium Unlimited.');
     }
@@ -350,26 +404,29 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
     const orderData = {
         order_id: orderId,
         user_id: userId,
+        user_email: (userEmail || '').toLowerCase().trim(),
         plan_code: targetPlan.code,
         price: targetPlan.price,
         promo_code: promoRes.valid ? promoRes.code : null,
         discount_amount: promoRes.discount_amount || 0,
         total_amount: promoRes.total_amount,
         payment_method: paymentMethod || 'QRIS',
-        status: 'PENDING',  // ← Always PENDING. Never PAID here.
+        status: 'PENDING',  // Always PENDING. Requires Admin Approval.
+        notes: notes || (customerPhone ? `No HP: ${customerPhone}` : null),
         expired_at: expiredAt,
         created_at: new Date().toISOString()
     };
 
     if (supabase) {
-        const { error } = await supabase.from('orders').insert([orderData]);
-        if (error) {
-            console.error('Error inserting order:', error);
-            // Still return orderData for localStorage fallback
+        let { error } = await supabase.from('orders').insert([orderData]);
+        if (error && error.message?.includes('user_email')) {
+            // Fallback if user_email column is not yet in DB schema
+            const { user_email, ...fallbackOrder } = orderData;
+            await supabase.from('orders').insert([fallbackOrder]);
         }
     }
 
-    // Save to local orders cache (status PENDING only)
+    // Save to local orders cache
     try {
         const localOrdersStr = localStorage.getItem('local_user_orders') || '[]';
         const localOrders = JSON.parse(localOrdersStr);
@@ -381,8 +438,6 @@ export const createCheckoutOrder = async ({ userId, planCode, paymentMethod, pro
 };
 
 // 7b. Check Payment Status (for frontend polling)
-// Returns current status of an order from database.
-// Frontend polls this every 3-5 seconds to detect when Admin confirms payment.
 export const checkPaymentStatus = async (orderId) => {
     if (!orderId) return null;
 
@@ -390,7 +445,7 @@ export const checkPaymentStatus = async (orderId) => {
         try {
             const { data, error } = await supabase
                 .from('orders')
-                .select('order_id, status, plan_code, total_amount, payment_method, paid_at, expired_at, created_at')
+                .select('*')
                 .eq('order_id', orderId)
                 .maybeSingle();
 
@@ -408,9 +463,7 @@ export const checkPaymentStatus = async (orderId) => {
     }
 };
 
-// 8. Admin Confirm Payment (ADMIN-ONLY — called from Admin Dashboard after manual verification)
-// ⚠️ This function must NEVER be called from user-facing checkout UI.
-// It is only called when an admin manually confirms a transfer in the Admin Dashboard.
+// 8. Admin Confirm Payment (ADMIN-ONLY — called from Admin Dashboard to APPROVE order)
 export const adminConfirmPayment = async (orderId) => {
     if (!orderId) throw new Error('Order ID diperlukan.');
     if (!supabase) throw new Error('Database tidak tersedia.');
@@ -438,11 +491,12 @@ export const adminConfirmPayment = async (orderId) => {
         .eq('order_id', orderId);
 
     // Activate subscription
-    const currentSub = await getUserSubscriptionStatus(order.user_id);
+    const currentSub = await getUserSubscriptionStatus(order.user_id, order.user_email);
     const newDates = calculateRenewalDates(currentSub, order.plan_code);
 
     const subPayload = {
         user_id: order.user_id,
+        user_email: order.user_email || null,
         plan_code: order.plan_code,
         subscription_status: 'ACTIVE',
         subscription_start: newDates.subscription_start,
@@ -458,17 +512,31 @@ export const adminConfirmPayment = async (orderId) => {
         .maybeSingle();
 
     if (existingSub) {
-        await supabase
+        let updateRes = await supabase
             .from('user_subscriptions')
             .update(subPayload)
             .eq('id', existingSub.id);
+        if (updateRes.error && updateRes.error.message?.includes('user_email')) {
+            const { user_email, ...fallbackSub } = subPayload;
+            await supabase.from('user_subscriptions').update(fallbackSub).eq('id', existingSub.id);
+        }
     } else {
-        await supabase
+        let insertRes = await supabase
             .from('user_subscriptions')
             .insert([subPayload]);
+        if (insertRes.error && insertRes.error.message?.includes('user_email')) {
+            const { user_email, ...fallbackSub } = subPayload;
+            await supabase.from('user_subscriptions').insert([fallbackSub]);
+        }
     }
 
-    return { success: true, order: { ...order, status: 'PAID' }, subPayload };
+    // Update local cache if available
+    try {
+        const localKey = `local_sub_${order.user_id}`;
+        localStorage.setItem(localKey, JSON.stringify(subPayload));
+    } catch {}
+
+    return { success: true, order: { ...order, status: 'PAID', paid_at: now }, subPayload };
 };
 
 // 8b. Admin Reject/Cancel Payment (ADMIN-ONLY)
@@ -478,7 +546,7 @@ export const adminCancelPayment = async (orderId, reason = '') => {
 
     const { error } = await supabase
         .from('orders')
-        .update({ status: 'CANCELLED', notes: reason || 'Dibatalkan oleh admin' })
+        .update({ status: 'CANCELLED', notes: reason || 'Dibatalkan oleh Admin Utama' })
         .eq('order_id', orderId)
         .neq('status', 'PAID'); // Cannot cancel already PAID orders
 
@@ -486,25 +554,26 @@ export const adminCancelPayment = async (orderId, reason = '') => {
     return { success: true };
 };
 
-// 9. Admin Grant Premium (Strictly 3 options: PREMIUM_MONTHLY, PREMIUM_YEARLY, PREMIUM_LIFETIME)
-export const adminGrantPremium = async ({ adminUserId, targetUserId, planCode, note = '' }) => {
+// 9. Admin Grant / Modify Premium Directly
+export const adminGrantPremium = async ({ adminUserId, targetUserId, targetUserEmail, planCode, note = '' }) => {
     if (!['PREMIUM_MONTHLY', 'PREMIUM_YEARLY', 'PREMIUM_LIFETIME'].includes(planCode)) {
         throw new Error('Paket grant admin hanya boleh Premium 1 Bulan, Premium 1 Tahun, atau Premium Unlimited.');
     }
 
-    const currentSub = await getUserSubscriptionStatus(targetUserId);
+    const currentSub = await getUserSubscriptionStatus(targetUserId, targetUserEmail);
     const newDates = calculateRenewalDates(currentSub, planCode);
 
     const subPayload = {
         user_id: targetUserId,
+        user_email: targetUserEmail || null,
         plan_code: planCode,
         subscription_status: 'ACTIVE',
         subscription_start: newDates.subscription_start,
         subscription_end: newDates.subscription_end,
         source: 'ADMIN_GRANTED',
-        granted_by: adminUserId || 'ADMIN',
+        granted_by: adminUserId || 'SUPER_ADMIN',
         granted_at: new Date().toISOString(),
-        note,
+        note: note || 'Diberikan langsung oleh Admin Utama arbain@gmail.com',
         updated_at: new Date().toISOString()
     };
 
@@ -516,16 +585,119 @@ export const adminGrantPremium = async ({ adminUserId, targetUserId, planCode, n
             .maybeSingle();
 
         if (existingSub) {
-            await supabase
+            let res = await supabase
                 .from('user_subscriptions')
                 .update(subPayload)
                 .eq('id', existingSub.id);
+            if (res.error && res.error.message?.includes('user_email')) {
+                const { user_email, ...fallbackSub } = subPayload;
+                await supabase.from('user_subscriptions').update(fallbackSub).eq('id', existingSub.id);
+            }
         } else {
-            await supabase
+            let res = await supabase
                 .from('user_subscriptions')
                 .insert([subPayload]);
+            if (res.error && res.error.message?.includes('user_email')) {
+                const { user_email, ...fallbackSub } = subPayload;
+                await supabase.from('user_subscriptions').insert([fallbackSub]);
+            }
         }
     }
 
+    try {
+        const localKey = `local_sub_${targetUserId}`;
+        localStorage.setItem(localKey, JSON.stringify(subPayload));
+    } catch {}
+
     return subPayload;
+};
+
+// 10. Admin Revoke Premium (Revert to FREE)
+export const adminRevokePremium = async (targetUserId) => {
+    if (!targetUserId) throw new Error('User ID diperlukan.');
+    if (!supabase) throw new Error('Database tidak tersedia.');
+
+    const subPayload = {
+        plan_code: 'FREE',
+        subscription_status: 'FREE',
+        subscription_end: new Date().toISOString(),
+        note: 'Dicabut oleh Admin Utama',
+        updated_at: new Date().toISOString()
+    };
+
+    await supabase
+        .from('user_subscriptions')
+        .update(subPayload)
+        .eq('user_id', targetUserId);
+
+    try {
+        const localKey = `local_sub_${targetUserId}`;
+        localStorage.removeItem(localKey);
+    } catch {}
+
+    return { success: true };
+};
+
+// 11. Sync User Profile upon Registration or Login
+// Ensures every user is present in user_subscriptions with email so Admin Utama can control them
+export const recordUserLoginOrRegister = async (user) => {
+    if (!user || !user.id || !supabase) return;
+    try {
+        const email = user.email?.toLowerCase().trim();
+        const isAdmin = isSuperAdmin(email);
+
+        const { data: existing } = await supabase
+            .from('user_subscriptions')
+            .select('id, user_email, plan_code')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (!existing) {
+            const initialSub = {
+                user_id: user.id,
+                user_email: email,
+                plan_code: isAdmin ? 'PREMIUM_LIFETIME' : 'FREE',
+                subscription_status: isAdmin ? 'ACTIVE' : 'FREE',
+                subscription_start: new Date().toISOString(),
+                subscription_end: null,
+                source: isAdmin ? 'ADMIN_GRANTED' : 'PAID',
+                granted_by: isAdmin ? 'SYSTEM' : null,
+                note: isAdmin ? 'Admin Utama System Account' : 'Pengguna Baru',
+                updated_at: new Date().toISOString()
+            };
+
+            let res = await supabase.from('user_subscriptions').insert([initialSub]);
+            if (res.error && res.error.message?.includes('user_email')) {
+                const { user_email, ...fallbackSub } = initialSub;
+                await supabase.from('user_subscriptions').insert([fallbackSub]);
+            }
+        } else if (!existing.user_email && email) {
+            await supabase
+                .from('user_subscriptions')
+                .update({ user_email: email })
+                .eq('id', existing.id);
+        }
+    } catch (e) {
+        console.warn('recordUserLoginOrRegister non-blocking warning:', e);
+    }
+};
+
+// 12. Fetch All Subscriptions & Orders exclusively for Admin Utama
+export const fetchAdminData = async () => {
+    if (!supabase) return { subscriptions: [], orders: [] };
+
+    try {
+        const [subRes, orderRes] = await Promise.all([
+            supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
+            supabase.from('orders').select('*').order('created_at', { ascending: false })
+        ]);
+
+        return {
+            subscriptions: subRes.data || [],
+            orders: orderRes.data || []
+        };
+    } catch (err) {
+        console.error('Error fetching admin data:', err);
+        return { subscriptions: [], orders: [] };
+    }
 };

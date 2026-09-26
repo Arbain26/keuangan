@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { 
@@ -10,9 +10,10 @@ import {
     DEFAULT_PLANS 
 } from '../utils/subscriptionEngine';
 import { formatCurrency } from '../utils/format';
+import BarcodePayment from '../components/BarcodePayment';
 import { 
     Check, X, Sparkles, Shield, Zap, Award, ArrowLeft, CreditCard, 
-    QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle, Copy
+    QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle, Copy, Phone
 } from 'lucide-react';
 
 const PricingPage = () => {
@@ -29,6 +30,7 @@ const PricingPage = () => {
     const [promoError, setPromoError] = useState('');
     const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('QRIS');
+    const [customerPhone, setCustomerPhone] = useState('');
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     
     // Payment flow state
@@ -117,6 +119,7 @@ const PricingPage = () => {
         setPromoResult(null);
         setPromoError('');
         setPaymentMethod('QRIS');
+        setCustomerPhone('');
         setPendingOrder(null);
         setPaymentConfirmed(false);
     };
@@ -140,17 +143,19 @@ const PricingPage = () => {
         }
     };
 
-    // âš ï¸ CRITICAL FIX: This ONLY creates a PENDING order.
-    // It does NOT activate Premium. Premium is activated only by Admin after verifying payment.
+    // CRITICAL: This ONLY creates a PENDING order.
+    // It does NOT activate Premium. Premium is activated only by Admin Utama (arbain@gmail.com) after verifying payment.
     const handlePayNow = async () => {
         if (!selectedPlan || !user) return;
         setIsProcessingPayment(true);
         try {
             const order = await createCheckoutOrder({
                 userId: user.id,
+                userEmail: user.email,
                 planCode: selectedPlan.code,
                 paymentMethod,
-                promoCode: promoResult ? promoResult.code : null
+                promoCode: promoResult ? promoResult.code : null,
+                customerPhone
             });
             // Order is now PENDING. Show waiting-for-payment screen.
             setPendingOrder(order);
@@ -584,13 +589,13 @@ const PricingPage = () => {
                         {/* === VIEW 3: PAYMENT CONFIRMED SUCCESS === */}
                         {paymentConfirmed ? (
                             <div className="text-center py-6">
-                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
+                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg shadow-green-500/20">
                                     <CheckCircle2 className="w-12 h-12" />
                                 </div>
-                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Dikonfirmasi! ðŸŽ‰</h3>
-                                <p className="text-gray-500 text-sm mb-6">
+                                <h3 className="text-2xl font-bold text-gray-900 mb-2">Pembayaran Dikonfirmasi! 🎉</h3>
+                                <p className="text-gray-600 text-sm mb-6">
                                     Paket <strong className="text-blue-600">{selectedPlan.name}</strong> telah aktif pada akun Anda.
-                                    Nikmati akses Premium tanpa batas!
+                                    Nikmati seluruh fitur premium tanpa batas sekarang juga!
                                 </p>
                                 <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-xs space-y-2 mb-6 text-left">
                                     <div className="flex justify-between text-gray-600">
@@ -603,128 +608,99 @@ const PricingPage = () => {
                                     </div>
                                     <div className="flex justify-between text-gray-600">
                                         <span>Total Dibayar</span>
-                                        <span className="font-bold text-green-600">{formatCurrency(pendingOrder?.total_amount)}</span>
+                                        <span className="font-bold text-green-700">{formatCurrency(pendingOrder?.total_amount)}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
                                         <span>Status</span>
-                                        <span className="font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-md">âœ… PAID</span>
+                                        <span className="font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md">✓ PAID (AKTIF)</span>
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => { setSelectedPlan(null); navigate('/'); }}
-                                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition shadow-md"
+                                    onClick={() => { setSelectedPlan(null); navigate('/admin'); }}
+                                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition shadow-lg shadow-blue-600/25 active:scale-98"
                                 >
-                                    Ke Dashboard Utama
+                                    Buka Dashboard Saya
                                 </button>
                             </div>
 
                         /* === VIEW 2: WAITING FOR PAYMENT (PENDING) === */
                         ) : pendingOrder ? (
                             <div>
-                                <div className="text-center mb-6">
-                                    <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <AlertCircle className="w-8 h-8" />
+                                <div className="text-center mb-5">
+                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <AlertCircle className="w-6 h-6" />
                                     </div>
                                     <h3 className="text-xl font-bold text-gray-900">Menunggu Pembayaran</h3>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Selesaikan transfer, lalu akun Anda akan diaktifkan oleh admin (biasanya dalam 1-24 jam).
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Silakan selesaikan pembayaran via Barcode QRIS, E-Wallet, atau Transfer Bank.
                                     </p>
                                 </div>
 
                                 {/* Order Summary */}
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 text-xs space-y-2">
-                                    <div className="flex justify-between text-gray-700">
+                                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 mb-4 text-xs space-y-2">
+                                    <div className="flex justify-between items-center text-gray-700">
                                         <span className="font-medium">Order ID</span>
-                                        <span className="font-mono font-bold text-gray-900 flex items-center gap-2">
+                                        <span className="font-mono font-bold text-gray-900 flex items-center gap-1.5">
                                             {pendingOrder.order_id}
-                                            <button onClick={() => handleCopyText(pendingOrder.order_id, 'orderid')} className="text-amber-600 hover:text-amber-700">
-                                                <Copy className="w-3 h-3" />
+                                            <button onClick={() => handleCopyText(pendingOrder.order_id, 'orderid')} className="text-amber-600 hover:text-amber-700 p-0.5" title="Salin Order ID">
+                                                <Copy className="w-3.5 h-3.5" />
                                             </button>
-                                            {copiedField === 'orderid' && <span className="text-green-600 text-[10px]">Tersalin!</span>}
+                                            {copiedField === 'orderid' && <span className="text-green-600 text-[10px] font-bold">Tersalin!</span>}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-gray-700">
-                                        <span className="font-medium">Paket</span>
+                                        <span className="font-medium">Paket Dipilih</span>
                                         <span className="font-bold text-gray-900">{selectedPlan.name}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-700">
                                         <span className="font-medium">Metode</span>
-                                        <span className="font-bold text-gray-900">{pendingOrder.payment_method}</span>
+                                        <span className="font-bold text-blue-700">{pendingOrder.payment_method}</span>
                                     </div>
-                                    <div className="flex justify-between border-t border-amber-200 pt-2 text-gray-900">
-                                        <span className="font-bold">Total Transfer</span>
-                                        <span className="font-extrabold text-amber-700 text-sm">{formatCurrency(pendingOrder.total_amount)}</span>
+                                    <div className="flex justify-between border-t border-amber-200/80 pt-2 text-gray-900">
+                                        <span className="font-bold">Total Pembayaran</span>
+                                        <span className="font-black text-amber-700 text-base">{formatCurrency(pendingOrder.total_amount)}</span>
                                     </div>
                                 </div>
 
-                                {/* Payment destination info */}
-                                <div className="space-y-3 mb-4">
-                                    {(pendingOrder.payment_method === 'E-Wallet' || pendingOrder.payment_method === 'QRIS') && (
-                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs">
-                                            <p className="font-bold text-emerald-900 mb-2 flex items-center"><Wallet className="w-3.5 h-3.5 mr-1" /> E-Wallet (DANA / GoPay)</p>
-                                            <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-emerald-100">
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400">Nomor Tujuan â€” a.n. Muhammad Arbain</p>
-                                                    <p className="font-mono font-extrabold text-emerald-900">082215322757</p>
-                                                </div>
-                                                <button onClick={() => handleCopyText('082215322757', 'ewallet2')} className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2 py-1 rounded-lg transition">
-                                                    <Copy className="w-3 h-3" /> {copiedField === 'ewallet2' ? 'Tersalin!' : 'Salin'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {(pendingOrder.payment_method === 'Virtual Account' || pendingOrder.payment_method === 'QRIS') && (
-                                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs">
-                                            <p className="font-bold text-purple-900 mb-2 flex items-center"><Building2 className="w-3.5 h-3.5 mr-1" /> Transfer Bank BRI</p>
-                                            <div className="flex justify-between items-center bg-white rounded-lg p-2 border border-purple-100">
-                                                <div>
-                                                    <p className="text-[10px] text-gray-400">No. Rekening â€” a.n. Muhammad Arbain</p>
-                                                    <p className="font-mono font-extrabold text-purple-900">362901036404538</p>
-                                                </div>
-                                                <button onClick={() => handleCopyText('362901036404538', 'bri2')} className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-lg transition">
-                                                    <Copy className="w-3 h-3" /> {copiedField === 'bri2' ? 'Tersalin!' : 'Salin'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Instructions */}
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600 mb-4 space-y-1">
-                                    <p className="font-bold text-gray-800 mb-1">ðŸ“‹ Langkah selanjutnya:</p>
-                                    <p>1ï¸âƒ£ Transfer <strong>{formatCurrency(pendingOrder.total_amount)}</strong> ke rekening/ewallet di atas</p>
-                                    <p>2ï¸âƒ£ Cantumkan Order ID: <strong className="font-mono">{pendingOrder.order_id}</strong> sebagai keterangan transfer (jika ada kolom keterangan)</p>
-                                    <p>3ï¸âƒ£ Setelah transfer, tunggu konfirmasi admin (1â€“24 jam kerja)</p>
-                                    <p>4ï¸âƒ£ Status akan otomatis berubah menjadi âœ… AKTIF</p>
+                                {/* Dedicated Barcode, E-Wallet & Bank Component */}
+                                <div className="mb-4">
+                                    <BarcodePayment
+                                        orderId={pendingOrder.order_id}
+                                        planName={selectedPlan.name}
+                                        totalAmount={pendingOrder.total_amount}
+                                        userEmail={user?.email}
+                                        selectedMethod={pendingOrder.payment_method}
+                                        onMethodChange={(newM) => setPaymentMethod(newM)}
+                                    />
                                 </div>
 
                                 {/* Countdown */}
                                 {countdown !== null && countdown > 0 && (
-                                    <div className="text-center text-xs text-gray-500 mb-4">
+                                    <div className="text-center text-xs text-gray-500 mb-3">
                                         <span className="bg-gray-100 rounded-lg px-3 py-1 font-mono font-bold text-gray-700">
-                                            â± Order berlaku: {formatCountdown(countdown)}
+                                            ⏱ Sisa Waktu Order: {formatCountdown(countdown)}
                                         </span>
                                     </div>
                                 )}
                                 {countdown === 0 && (
-                                    <div className="text-center text-xs text-red-600 font-bold mb-4 bg-red-50 rounded-lg px-3 py-2">
-                                        âš ï¸ Order telah kedaluwarsa (24 jam). Buat order baru jika ingin melanjutkan.
+                                    <div className="text-center text-xs text-red-600 font-bold mb-3 bg-red-50 rounded-lg px-3 py-2">
+                                        Order telah kedaluwarsa. Silakan buat pesanan baru jika ingin melanjutkan.
                                     </div>
                                 )}
 
                                 {/* Status indicator - auto polling */}
-                                <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-4">
-                                    <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-                                    Memeriksa status otomatis setiap 5 detik...
+                                <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4 bg-gray-50 py-2.5 rounded-xl border border-gray-100">
+                                    <div className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse"></div>
+                                    <span>Menunggu konfirmasi Admin Utama... Diperiksa otomatis setiap 5 detik</span>
                                 </div>
 
-                                {/* Buttons */}
-                                <div className="flex gap-3">
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
                                     <button
                                         onClick={() => setSelectedPlan(null)}
                                         className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition"
                                     >
-                                        Tutup
+                                        Tutup & Bayar Nanti
                                     </button>
                                     <button
                                         onClick={handleCheckStatus}
@@ -734,7 +710,7 @@ const PricingPage = () => {
                                         {isCheckingStatus ? (
                                             <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Memeriksa...</>
                                         ) : (
-                                            <><Shield className="w-3.5 h-3.5" /> Cek Status Pembayaran</>
+                                            <><Shield className="w-3.5 h-3.5" /> Periksa Status Pembayaran</>
                                         )}
                                     </button>
                                 </div>
@@ -744,10 +720,10 @@ const PricingPage = () => {
                         ) : (
                             <div>
                                 <h3 className="text-xl font-bold text-gray-900 mb-1">Checkout Pembayaran</h3>
-                                <p className="text-xs text-gray-500 mb-6">Selesaikan pembayaran untuk mengaktifkan paket Premium</p>
+                                <p className="text-xs text-gray-500 mb-5">Selesaikan pemesanan untuk mengaktifkan paket Premium</p>
 
                                 {/* Plan Selected Card Summary */}
-                                <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 mb-6 flex justify-between items-center">
+                                <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 mb-5 flex justify-between items-center">
                                     <div>
                                         <div className="text-xs font-bold text-blue-900">{selectedPlan.name}</div>
                                         <div className="text-[11px] text-blue-700">
@@ -759,8 +735,24 @@ const PricingPage = () => {
                                     </div>
                                 </div>
 
+                                {/* Customer WhatsApp Phone Number (Optional) */}
+                                <div className="mb-4">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                                        <Phone className="w-3.5 h-3.5 text-gray-500" />
+                                        Nomor WhatsApp Pembeli (Opsional)
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={customerPhone}
+                                        onChange={(e) => setCustomerPhone(e.target.value)}
+                                        placeholder="Contoh: 082215322757"
+                                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <p className="text-[10px] text-gray-400 mt-1">Memudahkan admin saat memverifikasi atau menghubungi Anda.</p>
+                                </div>
+
                                 {/* Promo Code Input */}
-                                <div className="mb-6">
+                                <div className="mb-5">
                                     <label className="block text-xs font-bold text-gray-700 mb-1.5">Kode Promo / Diskon</label>
                                     <div className="flex gap-2">
                                         <div className="relative flex-1">
@@ -769,7 +761,7 @@ const PricingPage = () => {
                                                 type="text"
                                                 value={promoCodeInput}
                                                 onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
-                                                placeholder="Contoh: HEMAT20"
+                                                placeholder="Contoh: HEMAT20 atau PROMO50"
                                                 className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs uppercase font-mono tracking-wider text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
@@ -777,7 +769,7 @@ const PricingPage = () => {
                                             type="button"
                                             onClick={handleApplyPromo}
                                             disabled={isVerifyingPromo || !promoCodeInput.trim()}
-                                            className="px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold text-xs transition disabled:opacity-50"
+                                            className="px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-xs transition disabled:opacity-50"
                                         >
                                             {isVerifyingPromo ? 'Gunakan...' : 'Terapkan'}
                                         </button>
@@ -796,172 +788,81 @@ const PricingPage = () => {
                                     )}
                                 </div>
 
-                                {/* Payment Method Selector */}
-                                <div className="mb-6">
-                                    <label className="block text-xs font-bold text-gray-700 mb-2">Metode Pembayaran</label>
-                                    <div className="grid grid-cols-3 gap-2.5 mb-4">
+                                {/* Payment Method Selector Preview */}
+                                <div className="mb-5">
+                                    <label className="block text-xs font-bold text-gray-700 mb-2">Pilihan Metode Pembayaran</label>
+                                    <div className="grid grid-cols-3 gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod('QRIS')}
-                                            className={`p-3 rounded-xl border flex flex-col items-center justify-center text-xs transition ${
+                                            className={`p-3 rounded-2xl border flex flex-col items-center justify-center text-xs transition ${
                                                 paymentMethod === 'QRIS'
                                                     ? 'border-blue-600 bg-blue-50/50 text-blue-700 font-bold ring-2 ring-blue-600/20'
                                                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                             }`}
                                         >
                                             <QrCode className="w-5 h-5 mb-1 text-blue-600" />
-                                            QRIS
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => setPaymentMethod('Virtual Account')}
-                                            className={`p-3 rounded-xl border flex flex-col items-center justify-center text-xs transition ${
-                                                paymentMethod === 'Virtual Account'
-                                                    ? 'border-blue-600 bg-blue-50/50 text-blue-700 font-bold ring-2 ring-blue-600/20'
-                                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                            }`}
-                                        >
-                                            <Building2 className="w-5 h-5 mb-1 text-purple-600" />
-                                            Transfer Bank (BRI)
+                                            <span className="font-bold">Barcode QRIS</span>
                                         </button>
 
                                         <button
                                             type="button"
                                             onClick={() => setPaymentMethod('E-Wallet')}
-                                            className={`p-3 rounded-xl border flex flex-col items-center justify-center text-xs transition ${
+                                            className={`p-3 rounded-2xl border flex flex-col items-center justify-center text-xs transition ${
                                                 paymentMethod === 'E-Wallet'
-                                                    ? 'border-blue-600 bg-blue-50/50 text-blue-700 font-bold ring-2 ring-blue-600/20'
+                                                    ? 'border-emerald-600 bg-emerald-50/50 text-emerald-700 font-bold ring-2 ring-emerald-600/20'
                                                     : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                                             }`}
                                         >
                                             <Wallet className="w-5 h-5 mb-1 text-emerald-600" />
-                                            E-Wallet (DANA/GoPay)
+                                            <span className="font-bold">E-Wallet</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setPaymentMethod('Virtual Account')}
+                                            className={`p-3 rounded-2xl border flex flex-col items-center justify-center text-xs transition ${
+                                                paymentMethod === 'Virtual Account'
+                                                    ? 'border-purple-600 bg-purple-50/50 text-purple-700 font-bold ring-2 ring-purple-600/20'
+                                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <Building2 className="w-5 h-5 mb-1 text-purple-600" />
+                                            <span className="font-bold">Rekening BRI</span>
                                         </button>
                                     </div>
-
-                                    {/* Account Details Box */}
-                                    {paymentMethod === 'E-Wallet' && (
-                                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 text-xs">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-bold text-emerald-900 flex items-center">
-                                                    <Wallet className="w-4 h-4 mr-1.5 text-emerald-600" />
-                                                    E-Wallet (DANA / GoPay)
-                                                </span>
-                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-emerald-200 shadow-sm mt-2">
-                                                <div>
-                                                    <div className="text-[10px] text-gray-500 font-medium">Nomor E-Wallet</div>
-                                                    <div className="font-mono text-sm font-extrabold text-emerald-950">082215322757</div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopyText('082215322757', 'ewallet')}
-                                                    className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition"
-                                                >
-                                                    <Copy className="w-3.5 h-3.5" />
-                                                    {copiedField === 'ewallet' ? 'Tersalin!' : 'Salin'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {paymentMethod === 'Virtual Account' && (
-                                        <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 text-xs">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-bold text-purple-900 flex items-center">
-                                                    <Building2 className="w-4 h-4 mr-1.5 text-purple-600" />
-                                                    Rekening Bank BRI
-                                                </span>
-                                                <span className="text-[10px] bg-purple-100 text-purple-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-purple-200 shadow-sm mt-2">
-                                                <div>
-                                                    <div className="text-[10px] text-gray-500 font-medium">Nomor Rekening BRI</div>
-                                                    <div className="font-mono text-sm font-extrabold text-purple-950">362901036404538</div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopyText('362901036404538', 'bri')}
-                                                    className="flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-lg transition"
-                                                >
-                                                    <Copy className="w-3.5 h-3.5" />
-                                                    {copiedField === 'bri' ? 'Tersalin!' : 'Salin'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {paymentMethod === 'QRIS' && (
-                                        <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 text-xs">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-bold text-blue-900 flex items-center">
-                                                    <QrCode className="w-4 h-4 mr-1.5 text-blue-600" />
-                                                    QRIS / Transfer Langsung
-                                                </span>
-                                                <span className="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-2 py-0.5 rounded-md uppercase">a.n. Muhammad Arbain</span>
-                                            </div>
-                                            <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm mt-2 space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-500 font-medium">E-Wallet (DANA/GoPay)</div>
-                                                        <div className="font-mono text-sm font-extrabold text-blue-950">082215322757</div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleCopyText('082215322757', 'qris')}
-                                                        className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition"
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                        {copiedField === 'qris' ? 'Tersalin!' : 'Salin'}
-                                                    </button>
-                                                </div>
-                                                <div className="flex justify-between items-center border-t border-blue-100 pt-2">
-                                                    <div>
-                                                        <div className="text-[10px] text-gray-500 font-medium">Rekening BRI</div>
-                                                        <div className="font-mono text-sm font-extrabold text-blue-950">362901036404538</div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleCopyText('362901036404538', 'qris-bri')}
-                                                        className="flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition"
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                        {copiedField === 'qris-bri' ? 'Tersalin!' : 'Salin'}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <p className="text-[10px] text-gray-400 mt-2 text-center">
+                                        {paymentMethod === 'QRIS' && 'Scan barcode dengan BCA Mobile, BRImo, DANA, GoPay, OVO, ShopeePay, dll.'}
+                                        {paymentMethod === 'E-Wallet' && 'Transfer saldo via DANA, GoPay, atau OVO ke 082215322757 a.n. Muhammad Arbain.'}
+                                        {paymentMethod === 'Virtual Account' && 'Transfer ke Rekening Bank BRI 362901036404538 a.n. Muhammad Arbain.'}
+                                    </p>
                                 </div>
 
                                 {/* Order Price Calculation Summary */}
-                                <div className="bg-gray-50 rounded-2xl p-4 mb-6 text-xs space-y-2 border border-gray-200">
+                                <div className="bg-gray-50 rounded-2xl p-4 mb-5 text-xs space-y-2 border border-gray-200">
                                     <div className="flex justify-between text-gray-600">
                                         <span>Harga Paket</span>
                                         <span>{formatCurrency(selectedPlan.price)}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-600">
-                                        <span>Promo Diskon</span>
+                                        <span>Diskon Promo</span>
                                         <span className="text-green-600 font-semibold">
                                             {promoResult ? `- ${formatCurrency(promoResult.discount_amount)}` : 'Rp0'}
                                         </span>
                                     </div>
                                     <div className="border-t border-gray-200 pt-2 flex justify-between text-sm font-bold text-gray-900">
                                         <span>Total Pembayaran</span>
-                                        <span className="text-blue-600 font-extrabold">
+                                        <span className="text-blue-600 font-extrabold text-base">
                                             {formatCurrency(promoResult ? promoResult.total_amount : selectedPlan.price)}
                                         </span>
                                     </div>
                                 </div>
 
-                                {/* Warning Banner */}
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800 mb-4 flex items-start gap-2">
-                                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                                {/* Notice */}
+                                <div className="bg-blue-50/80 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-900 mb-5 flex items-start gap-2.5">
+                                    <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600" />
                                     <span>
-                                        <strong>Penting:</strong> Klik &quot;Buat Pesanan&quot; untuk mendapatkan Order ID, lalu transfer ke rekening/ewallet di atas.
-                                        Akses Premium akan aktif setelah admin memverifikasi pembayaran Anda (1â€“24 jam).
+                                        Klik tombol di bawah untuk membuat pesanan, lalu barcode QRIS / rekening transfer akan langsung ditampilkan untuk Anda bayar.
                                     </span>
                                 </div>
 
@@ -979,7 +880,7 @@ const PricingPage = () => {
                                     ) : (
                                         <span className="flex items-center">
                                             <Lock className="w-4 h-4 mr-2" />
-                                            Buat Pesanan ({formatCurrency(promoResult ? promoResult.total_amount : selectedPlan.price)})
+                                            Lanjutkan ke Pembayaran ({formatCurrency(promoResult ? promoResult.total_amount : selectedPlan.price)})
                                         </span>
                                     )}
                                 </button>

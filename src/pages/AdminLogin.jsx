@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
+import { recordUserLoginOrRegister } from '../utils/subscriptionEngine';
 import { Lock, Mail, ArrowRight, LayoutDashboard, AlertCircle } from 'lucide-react';
 
 const AdminLogin = () => {
@@ -15,7 +16,7 @@ const AdminLogin = () => {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -24,6 +25,9 @@ const AdminLogin = () => {
             setError(error.message);
             setLoading(false);
         } else {
+            if (data?.user) {
+                await recordUserLoginOrRegister(data.user);
+            }
             navigate('/admin');
         }
     };

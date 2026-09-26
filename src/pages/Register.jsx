@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
+import { recordUserLoginOrRegister } from '../utils/subscriptionEngine';
 import { Lock, Mail, ArrowRight, LayoutDashboard, AlertCircle, UserPlus } from 'lucide-react';
 
 const Register = () => {
@@ -30,7 +31,7 @@ const Register = () => {
             return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
         });
@@ -38,10 +39,13 @@ const Register = () => {
         if (error) {
             setError(error.message);
         } else {
-            setSuccessMessage('Pendaftaran berhasil! Jika perlu verifikasi, periksa email Anda. Anda dapat mencoba login sekarang.');
+            if (data?.user) {
+                await recordUserLoginOrRegister(data.user);
+            }
+            setSuccessMessage('Pendaftaran berhasil! Akun Anda telah terdaftar. Mengalihkan ke halaman login...');
             setTimeout(() => {
                 navigate('/login');
-            }, 3000);
+            }, 1500);
         }
         setLoading(false);
     };
