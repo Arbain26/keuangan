@@ -645,6 +645,83 @@ export const adminRevokePremium = async (targetUserId) => {
     return { success: true };
 };
 
+// 10b. Admin Edit User (Email, Plan, Status, End Date, Note)
+export const adminEditUserSubscription = async ({ userId, userEmail, planCode, subscriptionStatus, subscriptionEnd, note }) => {
+    if (!userId) throw new Error('User ID diperlukan.');
+    if (!supabase) throw new Error('Database tidak tersedia.');
+
+    if (isSuperAdmin(userEmail) && planCode !== 'PREMIUM_LIFETIME') {
+        throw new Error('Akun Admin Utama (arbain@gmail.com) harus selalu memiliki paket PREMIUM_LIFETIME.');
+    }
+
+    const payload = {
+        user_email: userEmail || null,
+        plan_code: planCode || 'FREE',
+        subscription_status: subscriptionStatus || 'FREE',
+        subscription_end: planCode === 'PREMIUM_LIFETIME' ? null : (subscriptionEnd || null),
+        note: note || '',
+        updated_at: new Date().toISOString()
+    };
+
+    let res = await supabase
+        .from('user_subscriptions')
+        .update(payload)
+        .eq('user_id', userId);
+
+    if (res.error && res.error.message?.includes('user_email')) {
+        const { user_email, ...fallbackPayload } = payload;
+        await supabase
+            .from('user_subscriptions')
+            .update(fallbackPayload)
+            .eq('user_id', userId);
+    }
+
+    try {
+        const localKey = `local_sub_${userId}`;
+        localStorage.setItem(localKey, JSON.stringify({ ...payload, user_id: userId }));
+    } catch {}
+
+    return { success: true };
+};
+
+// 10c. Admin Delete User completely (from subscriptions and orders)
+export const adminDeleteUserSubscription = async (userId, userEmail) => {
+    if (!userId) throw new Error('User ID diperlukan.');
+    if (!supabase) throw new Error('Database tidak tersedia.');
+
+    if (isSuperAdmin(userEmail)) {
+        throw new Error('Akun Admin Utama (arbain@gmail.com) diproteksi dan TIDAK BISA dihapus.');
+    }
+
+    // 1. Delete subscription record
+    const { error: subErr } = await supabase
+        .from('user_subscriptions')
+        .delete()
+        .eq('user_id', userId);
+
+    if (subErr) {
+        throw new Error(`Gagal menghapus langganan: ${subErr.message}`);
+    }
+
+    // 2. Delete orders record
+    try {
+        await supabase
+            .from('orders')
+            .delete()
+            .eq('user_id', userId);
+    } catch (e) {
+        console.warn('Orders cleanup non-critical error:', e);
+    }
+
+    // 3. Clean up cache
+    try {
+        const localKey = `local_sub_${userId}`;
+        localStorage.removeItem(localKey);
+    } catch {}
+
+    return { success: true };
+};
+
 // 11. Sync User Profile upon Registration or Login
 // Ensures every user is present in user_subscriptions with email so Admin Utama can control them
 export const recordUserLoginOrRegister = async (user) => {

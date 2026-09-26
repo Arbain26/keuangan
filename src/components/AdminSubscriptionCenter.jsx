@@ -15,7 +15,8 @@ import {
     ShoppingBag, 
     MessageCircle, 
     Clock,
-    AlertCircle
+    AlertCircle,
+    Trash2
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { isSuperAdmin } from '../utils/subscriptionEngine';
@@ -31,6 +32,7 @@ export const AdminSubscriptionCenter = ({
     onCancelOrder,
     onRevokePremium,
     onOpenGrantModal,
+    onDeleteUser,
     isConfirmingOrder
 }) => {
     const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -421,20 +423,30 @@ export const AdminSubscriptionCenter = ({
                                                 <div className="flex items-center justify-center gap-1.5">
                                                     <button
                                                         onClick={() => onOpenGrantModal(sub)}
-                                                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
-                                                        title="Beri atau Ubah Paket"
+                                                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-xs"
+                                                        title="Edit Pengguna & Paket"
                                                     >
                                                         <Edit2 className="w-3 h-3" />
-                                                        Ubah Paket
+                                                        Edit
                                                     </button>
                                                     {isActivePremium && !isCurrentUserAdmin && (
                                                         <button
                                                             onClick={() => onRevokePremium(sub.user_id, sub.user_email)}
-                                                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1"
+                                                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 border border-amber-200"
                                                             title="Cabut Status Premium (Kembalikan ke Free)"
                                                         >
                                                             <Ban className="w-3 h-3" />
                                                             Cabut
+                                                        </button>
+                                                    )}
+                                                    {!isCurrentUserAdmin && (
+                                                        <button
+                                                            onClick={() => onDeleteUser && onDeleteUser(sub.user_id, sub.user_email)}
+                                                            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[11px] font-bold transition flex items-center gap-1 border border-rose-200"
+                                                            title="Hapus User Secara Permanen"
+                                                        >
+                                                            <Trash2 className="w-3 h-3" />
+                                                            Hapus
                                                         </button>
                                                     )}
                                                 </div>
