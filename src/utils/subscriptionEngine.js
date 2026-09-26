@@ -2,9 +2,16 @@ import { supabase } from '../lib/supabaseClient';
 
 export const SUPER_ADMIN_EMAIL = 'arbain@gmail.com';
 
-export const isSuperAdmin = (email) => {
-    if (!email) return false;
-    return email.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+export const isSuperAdmin = (emailOrUser) => {
+    if (!emailOrUser) return false;
+    let emailStr = '';
+    if (typeof emailOrUser === 'string') {
+        emailStr = emailOrUser;
+    } else if (typeof emailOrUser === 'object' && emailOrUser !== null) {
+        emailStr = emailOrUser.email || emailOrUser.user_email || '';
+    }
+    if (!emailStr || typeof emailStr !== 'string') return false;
+    return emailStr.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
 };
 
 export const DEFAULT_PLANS = [
@@ -404,7 +411,7 @@ export const createCheckoutOrder = async ({
     const orderData = {
         order_id: orderId,
         user_id: userId,
-        user_email: (userEmail || '').toLowerCase().trim(),
+        user_email: (typeof userEmail === 'string' ? userEmail : userEmail?.email || '').toLowerCase().trim(),
         plan_code: targetPlan.code,
         price: targetPlan.price,
         promo_code: promoRes.valid ? promoRes.code : null,
@@ -643,7 +650,7 @@ export const adminRevokePremium = async (targetUserId) => {
 export const recordUserLoginOrRegister = async (user) => {
     if (!user || !user.id || !supabase) return;
     try {
-        const email = user.email?.toLowerCase().trim();
+        const email = typeof user?.email === 'string' ? user.email.toLowerCase().trim() : '';
         const isAdmin = isSuperAdmin(email);
 
         const { data: existing } = await supabase

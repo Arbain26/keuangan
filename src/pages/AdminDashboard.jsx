@@ -352,8 +352,8 @@ const AdminDashboard = () => {
             setPlans(planList);
             setUsageLimits(limits);
 
-            if (userData?.data?.user) {
-                const activeUser = userData.data.user;
+            const activeUser = userData?.data?.user || null;
+            if (activeUser) {
                 setUser(activeUser);
                 setProfileData(prev => ({
                     ...prev,
@@ -361,7 +361,7 @@ const AdminDashboard = () => {
                     fullName: activeUser.user_metadata?.full_name || 'Muhammad Arbain'
                 }));
 
-                const subStatus = await getUserSubscriptionStatus(activeUser.id);
+                const subStatus = await getUserSubscriptionStatus(activeUser.id, activeUser.email);
                 setUserSub(subStatus);
             }
 
@@ -1365,8 +1365,8 @@ const AdminDashboard = () => {
                                     >
                                         {activeTab === 'dashboard' && (
                                             <div className="space-y-6">
-                                                {/* STATUS AKUN CARD (Hanya untuk arbain@gmail.com) */}
-                                                {user?.email?.toLowerCase() === 'arbain@gmail.com' && (
+                                                {/* STATUS AKUN CARD (Hanya untuk Admin Utama) */}
+                                                {isAdminUtama && (
                                                     <div className="bg-gradient-to-r from-slate-900 to-blue-950 text-white rounded-3xl p-6 shadow-xl border border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                         <div>
                                                             <div className="flex items-center space-x-2 mb-2">

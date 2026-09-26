@@ -18,6 +18,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
+import { isSuperAdmin } from '../utils/subscriptionEngine';
 
 export const AdminSubscriptionCenter = ({
     user,
@@ -61,9 +62,9 @@ export const AdminSubscriptionCenter = ({
 
     const filteredUsers = allSubscriptions.filter(sub => {
         const term = userSearchTerm.toLowerCase().trim();
-        const matchesSearch = !term ||
-            (sub.user_email && sub.user_email.toLowerCase().includes(term)) ||
-            (sub.user_id && sub.user_id.toLowerCase().includes(term));
+        const emailStr = typeof sub.user_email === 'string' ? sub.user_email.toLowerCase() : '';
+        const idStr = typeof sub.user_id === 'string' ? sub.user_id.toLowerCase() : '';
+        const matchesSearch = !term || emailStr.includes(term) || idStr.includes(term);
         if (!matchesSearch) return false;
         if (userStatusFilter === 'ACTIVE') return sub.subscription_status === 'ACTIVE';
         if (userStatusFilter === 'FREE') return sub.plan_code === 'FREE' || sub.subscription_status === 'FREE';
@@ -365,7 +366,7 @@ export const AdminSubscriptionCenter = ({
                                 </tr>
                             ) : (
                                 filteredUsers.map((sub) => {
-                                    const isCurrentUserAdmin = sub.user_email?.toLowerCase() === 'arbain@gmail.com';
+                                    const isCurrentUserAdmin = isSuperAdmin(sub.user_email || sub);
                                     const isActivePremium = sub.subscription_status === 'ACTIVE' && sub.plan_code !== 'FREE';
                                     return (
                                         <tr key={sub.id || sub.user_id} className="hover:bg-gray-50/50 transition">

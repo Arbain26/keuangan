@@ -16,6 +16,22 @@ import {
     QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle, Copy, Phone
 } from 'lucide-react';
 
+const TableCheck = () => (
+    <div className="flex justify-center">
+        <span className="w-6 h-6 rounded-full bg-emerald-100/80 text-emerald-600 flex items-center justify-center shadow-xs">
+            <Check className="w-3.5 h-3.5 stroke-[3]" />
+        </span>
+    </div>
+);
+
+const TableCross = () => (
+    <div className="flex justify-center">
+        <span className="w-6 h-6 rounded-full bg-rose-100/80 text-rose-500 flex items-center justify-center shadow-xs">
+            <X className="w-3.5 h-3.5 stroke-[3]" />
+        </span>
+    </div>
+);
+
 const PricingPage = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
@@ -484,7 +500,11 @@ const PricingPage = () => {
                                         : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 shadow-lg shadow-amber-500/25'
                                 }`}
                             >
-                                {isCurrentPlan('PREMIUM_LIFETIME') ? 'âœ“ Anda Memiliki Unlimited' : 'Beli Sekarang'}
+                                {isCurrentPlan('PREMIUM_LIFETIME') ? (
+                                    <span className="inline-flex items-center justify-center gap-1.5">
+                                        <Check className="w-4 h-4" /> Anda Memiliki Unlimited
+                                    </span>
+                                ) : 'Beli Sekarang'}
                             </button>
                         </div>
                     </div>
@@ -513,52 +533,52 @@ const PricingPage = () => {
                         <tbody className="divide-y divide-gray-100 text-xs text-gray-800">
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Dashboard</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Fitur dasar</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Batas penggunaan</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-red-500 font-bold">âœ•</td>
-                                <td className="text-center text-red-500 font-bold">âœ•</td>
-                                <td className="text-center text-red-500 font-bold">âœ•</td>
+                                <td><TableCheck /></td>
+                                <td><TableCross /></td>
+                                <td><TableCross /></td>
+                                <td><TableCross /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Fitur Premium</td>
-                                <td className="text-center text-red-500 font-bold">âœ•</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td><TableCross /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Analisis lanjutan</td>
-                                <td className="text-center text-amber-600 font-semibold">Terbatas</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center font-semibold text-amber-600">Terbatas</td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Export</td>
-                                <td className="text-center text-amber-600 font-semibold">Terbatas</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td className="text-center font-semibold text-amber-600">Terbatas</td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr>
                                 <td className="py-3.5 px-6 font-medium">Semua fitur</td>
-                                <td className="text-center text-red-500 font-bold">âœ•</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
-                                <td className="text-center text-green-600 font-bold">âœ“</td>
+                                <td><TableCross /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
+                                <td><TableCheck /></td>
                             </tr>
                             <tr className="bg-gray-50/50">
                                 <td className="py-3.5 px-6 font-bold text-gray-900">Masa aktif</td>
