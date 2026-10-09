@@ -17,6 +17,7 @@ import {
     SUPER_ADMIN_EMAIL,
     fetchPlans, 
     fetchUsageLimits,
+    fetchAdminData,
     DEFAULT_PLANS,
     DEFAULT_LIMITS 
 } from '../utils/subscriptionEngine';
@@ -380,12 +381,9 @@ const AdminDashboard = () => {
             // Fetch All Subscriptions & Orders EXCLUSIVELY for Admin Utama (arbain@gmail.com)
             const isUserSuperAdmin = activeUser && isSuperAdmin(activeUser);
             if (supabase && isUserSuperAdmin) {
-                const [subRes, orderRes] = await Promise.all([
-                    supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
-                    supabase.from('orders').select('*').order('created_at', { ascending: false })
-                ]);
-                if (subRes.data) setAllSubscriptions(subRes.data);
-                if (orderRes.data) setAllOrders(orderRes.data);
+                const adminData = await fetchAdminData();
+                setAllSubscriptions(adminData.subscriptions || []);
+                setAllOrders(adminData.orders || []);
             } else {
                 setAllSubscriptions([]);
                 setAllOrders([]);
@@ -412,12 +410,9 @@ const AdminDashboard = () => {
             showToast(`✅ Order ${orderId} berhasil di-APPROVE sebagai PAID. Langganan user aktif!`);
             // Refresh orders & subscriptions list for Super Admin
             if (supabase && isSuperAdmin(user)) {
-                const [subRes, orderRes] = await Promise.all([
-                    supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
-                    supabase.from('orders').select('*').order('created_at', { ascending: false })
-                ]);
-                if (subRes.data) setAllSubscriptions(subRes.data);
-                if (orderRes.data) setAllOrders(orderRes.data);
+                const adminData = await fetchAdminData();
+                setAllSubscriptions(adminData.subscriptions || []);
+                setAllOrders(adminData.orders || []);
             }
         } catch (err) {
             showToast(err.message || 'Gagal mengkonfirmasi pembayaran.', 'error');
@@ -436,8 +431,8 @@ const AdminDashboard = () => {
             await adminCancelPayment(orderId, reason);
             showToast(`Order ${orderId} dibatalkan.`, 'error');
             if (supabase && isSuperAdmin(user)) {
-                const orderRes = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-                if (orderRes.data) setAllOrders(orderRes.data);
+                const adminData = await fetchAdminData();
+                setAllOrders(adminData.orders || []);
             }
         } catch (err) {
             showToast(err.message || 'Gagal membatalkan order.', 'error');
@@ -456,8 +451,8 @@ const AdminDashboard = () => {
             await adminRevokePremium(userId);
             showToast(`Akses Premium untuk ${targetDisplay} telah dicabut.`);
             if (supabase && isSuperAdmin(user)) {
-                const subRes = await supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false });
-                if (subRes.data) setAllSubscriptions(subRes.data);
+                const adminData = await fetchAdminData();
+                setAllSubscriptions(adminData.subscriptions || []);
             }
         } catch (err) {
             showToast(err.message || 'Gagal mencabut status Premium.', 'error');
@@ -2084,62 +2079,246 @@ const AdminDashboard = () => {
 
                                 {activeTab === 'reports' && (
                                     <div className="space-y-6">
-                                        {/* Report Summary */}
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-xl">
-                                                <h3 className="text-emerald-700 text-xs font-bold uppercase tracking-wider mb-2">Total Pemasukan</h3>
-                                                <p className="text-3xl text-gray-900 font-bold">{formatCurrency(totalIncome)}</p>
-                                            </div>
-                                            <div className="p-6 bg-rose-50 border border-rose-100 rounded-xl">
-                                                <h3 className="text-rose-700 text-xs font-bold uppercase tracking-wider mb-2">Total Pengeluaran</h3>
-                                                <p className="text-3xl text-gray-900 font-bold">{formatCurrency(totalExpense)}</p>
-                                            </div>
-                                            <div className="p-6 bg-blue-50 border border-blue-100 rounded-xl">
-                                                <h3 className="text-blue-700 text-xs font-bold uppercase tracking-wider mb-2">Saldo Bersih</h3>
-                                                <p className="text-3xl text-gray-900 font-bold">{formatCurrency(balance)}</p>
-                                            </div>
-                                        </div>
+                                        {/* ===== ANGGARAN BULANAN - PROFESSIONAL REPORT ===== */}
+                                        {(() => {
+                                            // Group transactions by category
+                                            const incomeByCategory = {};
+                                            const expenseByCategory = {};
 
-                                        {/* Report Table Preview */}
-                                        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm shadow-gray-100">
-                                            <div className="p-5 border-b border-gray-200">
-                                                <h3 className="font-bold text-gray-900">Preview Data Laporan</h3>
-                                            </div>
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-left text-sm text-gray-500">
-                                                    <thead className="bg-gray-50 text-gray-600 font-semibold">
-                                                        <tr>
-                                                            <th className="px-6 py-3 w-32">Tanggal</th>
-                                                            <th className="px-6 py-3 w-24">Tipe</th>
-                                                            <th className="px-6 py-3 w-32">Kategori</th>
-                                                            <th className="px-6 py-3">Keterangan</th>
-                                                            <th className="px-6 py-3 text-right w-32">Jumlah</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-100 bg-white">
-                                                        {filteredTransactions.length === 0 ? (
-                                                            <tr><td colSpan="5" className="text-center py-8 text-gray-400">Tidak ada data untuk periode ini.</td></tr>
-                                                        ) : (
-                                                            filteredTransactions.map(t => (
-                                                                <tr key={t.id} className="hover:bg-gray-50/50 transition">
-                                                                    <td className="px-6 py-3 text-gray-800">{formatDate(t.date)}</td>
-                                                                    <td className="px-6 py-3">
-                                                                        <span className={`text-xs px-2 py-1 rounded font-medium capitalize ${t.type === 'pemasukan' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                                                                            {t.type}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-6 py-3 text-gray-800">{capitalizeText(t.category)}</td>
-                                                                    <td className="px-6 py-3 truncate max-w-xs text-gray-600">{(t.description && t.description !== '-') ? t.description : '-'}</td>
-                                                                    <td className={`px-6 py-3 text-right font-medium ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-gray-800'}`}>
-                                                                        {formatCurrency(t.amount)}
-                                                                    </td>
-                                                                </tr>
-                                                            ))
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
+                                            filteredTransactions.forEach(t => {
+                                                const cat = capitalizeText(t.category || 'Lainnya');
+                                                const amt = Number(t.amount);
+                                                if (t.type === 'pemasukan') {
+                                                    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + amt;
+                                                } else {
+                                                    expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amt;
+                                                }
+                                            });
+
+                                            const incomeRows = Object.entries(incomeByCategory).sort((a, b) => b[1] - a[1]);
+                                            const expenseRows = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]);
+                                            const totalIncomeCat = incomeRows.reduce((s, [, v]) => s + v, 0);
+                                            const totalExpenseCat = expenseRows.reduce((s, [, v]) => s + v, 0);
+                                            const saldo = totalIncomeCat - totalExpenseCat;
+
+                                            const periodLabel = activePeriod === 'week' ? 'Minggu Ini'
+                                                : activePeriod === 'month' ? new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })
+                                                : activePeriod === 'year' ? `Tahun ${new Date().getFullYear()}`
+                                                : 'Semua Periode';
+
+                                            return (
+                                                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                                                    {/* Header */}
+                                                    <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                        <div>
+                                                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Laporan Keuangan</p>
+                                                            <h2 className="text-white text-xl font-extrabold tracking-tight">Anggaran Bulanan</h2>
+                                                            <p className="text-slate-300 text-xs mt-1">Periode: <span className="font-bold text-white">{periodLabel}</span></p>
+                                                        </div>
+                                                        {/* Saldo Box - top right */}
+                                                        <div className="flex gap-3 flex-wrap">
+                                                            <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-3 text-center min-w-[120px]">
+                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Pemasukan</p>
+                                                                <p className="text-emerald-400 font-extrabold text-sm mt-0.5">{formatCurrency(totalIncomeCat)}</p>
+                                                            </div>
+                                                            <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-3 text-center min-w-[120px]">
+                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Pengeluaran</p>
+                                                                <p className="text-rose-400 font-extrabold text-sm mt-0.5">{formatCurrency(totalExpenseCat)}</p>
+                                                            </div>
+                                                            <div className={`border rounded-xl px-4 py-3 text-center min-w-[120px] ${saldo >= 0 ? 'bg-emerald-600/20 border-emerald-500/40' : 'bg-rose-600/20 border-rose-500/40'}`}>
+                                                                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-wider">Saldo Bersih</p>
+                                                                <p className={`font-extrabold text-sm mt-0.5 ${saldo >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(saldo)}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="p-6 space-y-8">
+                                                        {/* PENDAPATAN TABLE */}
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <div className="w-3 h-3 rounded-sm bg-emerald-500"></div>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pendapatan</h3>
+                                                            </div>
+                                                            <div className="rounded-xl overflow-hidden border border-gray-200">
+                                                                <table className="w-full text-sm text-left">
+                                                                    <thead>
+                                                                        <tr className="bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider">
+                                                                            <th className="px-4 py-3 w-8">#</th>
+                                                                            <th className="px-4 py-3">Kategori / Sumber</th>
+                                                                            <th className="px-4 py-3 text-right">Aktual</th>
+                                                                            <th className="px-4 py-3 text-right w-32">% dari Total</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-gray-100">
+                                                                        {incomeRows.length === 0 ? (
+                                                                            <tr>
+                                                                                <td colSpan="4" className="px-4 py-6 text-center text-gray-400 text-xs italic">Belum ada data pendapatan untuk periode ini.</td>
+                                                                            </tr>
+                                                                        ) : incomeRows.map(([cat, amt], idx) => (
+                                                                            <tr key={cat} className={idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'}>
+                                                                                <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
+                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{cat}</td>
+                                                                                <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{formatCurrency(amt)}</td>
+                                                                                <td className="px-4 py-3 text-right">
+                                                                                    <div className="flex items-center justify-end gap-2">
+                                                                                        <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                                                            <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${totalIncomeCat > 0 ? (amt / totalIncomeCat * 100) : 0}%` }}></div>
+                                                                                        </div>
+                                                                                        <span className="text-xs text-gray-500 font-semibold w-10 text-right">
+                                                                                            {totalIncomeCat > 0 ? (amt / totalIncomeCat * 100).toFixed(1) : 0}%
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                    <tfoot>
+                                                                        <tr className="bg-emerald-100 border-t-2 border-emerald-300">
+                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-emerald-800 text-xs uppercase tracking-wider">Total Pendapatan</td>
+                                                                            <td className="px-4 py-3 text-right font-extrabold text-emerald-800 tabular-nums">{formatCurrency(totalIncomeCat)}</td>
+                                                                            <td className="px-4 py-3 text-right font-bold text-emerald-700 text-xs">100%</td>
+                                                                        </tr>
+                                                                    </tfoot>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* PENGELUARAN TABLE */}
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <div className="w-3 h-3 rounded-sm bg-rose-500"></div>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pengeluaran</h3>
+                                                            </div>
+                                                            <div className="rounded-xl overflow-hidden border border-gray-200">
+                                                                <table className="w-full text-sm text-left">
+                                                                    <thead>
+                                                                        <tr className="bg-rose-600 text-white text-xs font-bold uppercase tracking-wider">
+                                                                            <th className="px-4 py-3 w-8">#</th>
+                                                                            <th className="px-4 py-3">Kategori / Pos</th>
+                                                                            <th className="px-4 py-3 text-right">Aktual</th>
+                                                                            <th className="px-4 py-3 text-right w-32">% dari Total</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-gray-100">
+                                                                        {expenseRows.length === 0 ? (
+                                                                            <tr>
+                                                                                <td colSpan="4" className="px-4 py-6 text-center text-gray-400 text-xs italic">Belum ada data pengeluaran untuk periode ini.</td>
+                                                                            </tr>
+                                                                        ) : expenseRows.map(([cat, amt], idx) => (
+                                                                            <tr key={cat} className={idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/40'}>
+                                                                                <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
+                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{cat}</td>
+                                                                                <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{formatCurrency(amt)}</td>
+                                                                                <td className="px-4 py-3 text-right">
+                                                                                    <div className="flex items-center justify-end gap-2">
+                                                                                        <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                                                            <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: `${totalExpenseCat > 0 ? (amt / totalExpenseCat * 100) : 0}%` }}></div>
+                                                                                        </div>
+                                                                                        <span className="text-xs text-gray-500 font-semibold w-10 text-right">
+                                                                                            {totalExpenseCat > 0 ? (amt / totalExpenseCat * 100).toFixed(1) : 0}%
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                    <tfoot>
+                                                                        <tr className="bg-rose-100 border-t-2 border-rose-300">
+                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-rose-800 text-xs uppercase tracking-wider">Total Pengeluaran</td>
+                                                                            <td className="px-4 py-3 text-right font-extrabold text-rose-800 tabular-nums">{formatCurrency(totalExpenseCat)}</td>
+                                                                            <td className="px-4 py-3 text-right font-bold text-rose-700 text-xs">100%</td>
+                                                                        </tr>
+                                                                    </tfoot>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* RINGKASAN SALDO */}
+                                                        <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                                            <div className="bg-slate-700 px-4 py-3">
+                                                                <h3 className="text-white font-bold text-xs uppercase tracking-widest">Ringkasan Saldo</h3>
+                                                            </div>
+                                                            <table className="w-full text-sm text-left">
+                                                                <thead>
+                                                                    <tr className="bg-slate-100 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                                                                        <th className="px-4 py-2.5">Keterangan</th>
+                                                                        <th className="px-4 py-2.5 text-right">Aktual</th>
+                                                                        <th className="px-4 py-2.5 text-right">Status</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-100">
+                                                                    <tr className="bg-emerald-50/60">
+                                                                        <td className="px-4 py-3 font-semibold text-gray-700">Total Pendapatan</td>
+                                                                        <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{formatCurrency(totalIncomeCat)}</td>
+                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">Masuk</span></td>
+                                                                    </tr>
+                                                                    <tr className="bg-rose-50/60">
+                                                                        <td className="px-4 py-3 font-semibold text-gray-700">Total Pengeluaran</td>
+                                                                        <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{formatCurrency(totalExpenseCat)}</td>
+                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full font-bold">Keluar</span></td>
+                                                                    </tr>
+                                                                    <tr className={saldo >= 0 ? 'bg-blue-50' : 'bg-amber-50'}>
+                                                                        <td className="px-4 py-3 font-extrabold text-gray-900">SALDO BERSIH</td>
+                                                                        <td className={`px-4 py-3 text-right font-extrabold tabular-nums text-base ${saldo >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatCurrency(saldo)}</td>
+                                                                        <td className="px-4 py-3 text-right">
+                                                                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${saldo >= 0 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                                {saldo >= 0 ? '✓ Surplus' : '⚠ Defisit'}
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+
+                                                        {/* Detail Transaksi Preview */}
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-3 mt-4">
+                                                                <div className="w-3 h-3 rounded-sm bg-slate-500"></div>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Histori Transaksi</h3>
+                                                            </div>
+                                                            <div className="rounded-xl overflow-hidden border border-gray-200">
+                                                                <table className="w-full text-sm text-left">
+                                                                    <thead>
+                                                                        <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+                                                                            <th className="px-4 py-3">Tanggal</th>
+                                                                            <th className="px-4 py-3">Tipe</th>
+                                                                            <th className="px-4 py-3">Kategori</th>
+                                                                            <th className="px-4 py-3">Keterangan</th>
+                                                                            <th className="px-4 py-3 text-right">Jumlah</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-gray-100">
+                                                                        {filteredTransactions.length === 0 ? (
+                                                                            <tr><td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-xs italic">Tidak ada data untuk periode ini.</td></tr>
+                                                                        ) : filteredTransactions.slice(0, 15).map((t, idx) => (
+                                                                            <tr key={t.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-slate-50/50 hover:bg-slate-100/50'}>
+                                                                                <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{formatDate(t.date)}</td>
+                                                                                <td className="px-4 py-3">
+                                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${t.type === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                                                        {t.type === 'pemasukan' ? 'Masuk' : 'Keluar'}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{capitalizeText(t.category)}</td>
+                                                                                <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{(t.description && t.description !== '-') ? t.description : '—'}</td>
+                                                                                <td className={`px-4 py-3 text-right font-bold tabular-nums ${t.type === 'pemasukan' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                                {filteredTransactions.length > 15 && (
+                                                                    <div className="bg-slate-50 p-3 text-center border-t border-gray-200">
+                                                                        <span className="text-xs text-gray-500 italic">Menampilkan 15 transaksi terbaru...</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 )}
 

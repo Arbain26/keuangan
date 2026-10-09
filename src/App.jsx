@@ -28,6 +28,7 @@ const lazyWithRetry = (componentImport) =>
     }
   });
 
+const HomePage = lazyWithRetry(() => import('./pages/HomePage'));
 const PublicDashboard = lazyWithRetry(() => import('./pages/PublicDashboard'));
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
 const AdminLogin = lazyWithRetry(() => import('./pages/AdminLogin'));
@@ -72,7 +73,8 @@ function App() {
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
-              <Route path="/" element={<PublicDashboard />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/dashboard-publik" element={<PublicDashboard />} />
               <Route path="/login" element={<AdminLogin />} />
               <Route path="/register" element={<Register />} />
               <Route path="/pricing" element={<PricingPage />} />

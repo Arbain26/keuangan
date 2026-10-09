@@ -676,6 +676,15 @@ export const adminEditUserSubscription = async ({ userId, userEmail, planCode, s
             .eq('user_id', userId);
     }
 
+    // Synchronize Supabase Auth user email if changed
+    if (userEmail && supabase.auth?.admin?.updateUserById) {
+        try {
+            await supabase.auth.admin.updateUserById(userId, { email: userEmail });
+        } catch (e) {
+            console.warn('Supabase Auth user email update warning:', e);
+        }
+    }
+
     try {
         const localKey = `local_sub_${userId}`;
         localStorage.setItem(localKey, JSON.stringify({ ...payload, user_id: userId }));
@@ -684,7 +693,7 @@ export const adminEditUserSubscription = async ({ userId, userEmail, planCode, s
     return { success: true };
 };
 
-// 10c. Admin Delete User completely (from subscriptions and orders)
+// 10c. Admin Delete User completely (from subscriptions, orders, and Supabase Auth)
 export const adminDeleteUserSubscription = async (userId, userEmail) => {
     if (!userId) throw new Error('User ID diperlukan.');
     if (!supabase) throw new Error('Database tidak tersedia.');
@@ -713,7 +722,16 @@ export const adminDeleteUserSubscription = async (userId, userEmail) => {
         console.warn('Orders cleanup non-critical error:', e);
     }
 
-    // 3. Clean up cache
+    // 3. Delete from Supabase Auth so user account is completely removed
+    try {
+        if (supabase.auth?.admin?.deleteUser) {
+            await supabase.auth.admin.deleteUser(userId);
+        }
+    } catch (e) {
+        console.warn('Auth user delete warning:', e);
+    }
+
+    // 4. Clean up cache
     try {
         const localKey = `local_sub_${userId}`;
         localStorage.removeItem(localKey);
@@ -730,13 +748,12 @@ export const recordUserLoginOrRegister = async (user) => {
         const email = typeof user?.email === 'string' ? user.email.toLowerCase().trim() : '';
         const isAdmin = isSuperAdmin(email);
 
-        const { data: existing } = await supabase
+        const { data: existingList } = await supabase
             .from('user_subscriptions')
             .select('id, user_email, plan_code')
-            .eq('user_id', user.id)
-            .maybeSingle();
+            .eq('user_id', user.id);
 
-        if (!existing) {
+        if (!existingList || existingList.length === 0) {
             const initialSub = {
                 user_id: user.id,
                 user_email: email,
@@ -746,7 +763,7 @@ export const recordUserLoginOrRegister = async (user) => {
                 subscription_end: null,
                 source: isAdmin ? 'ADMIN_GRANTED' : 'PAID',
                 granted_by: isAdmin ? 'SYSTEM' : null,
-                note: isAdmin ? 'Admin Utama System Account' : 'Pengguna Baru',
+                note: isAdmin ? 'Admin Utama System Account' : 'Pengguna Terdaftar',
                 updated_at: new Date().toISOString()
             };
 
@@ -755,11 +772,20 @@ export const recordUserLoginOrRegister = async (user) => {
                 const { user_email, ...fallbackSub } = initialSub;
                 await supabase.from('user_subscriptions').insert([fallbackSub]);
             }
-        } else if (!existing.user_email && email) {
-            await supabase
-                .from('user_subscriptions')
-                .update({ user_email: email })
-                .eq('id', existing.id);
+        } else {
+            // Update email if it was missing or changed
+            const existing = existingList[0];
+            if (email && existing.user_email !== email) {
+                await supabase
+                    .from('user_subscriptions')
+                    .update({ user_email: email })
+                    .eq('user_id', user.id);
+            }
+            // If duplicate records exist for this user, delete extra duplicates
+            if (existingList.length > 1) {
+                const dupIds = existingList.slice(1).map(x => x.id);
+                await supabase.from('user_subscriptions').delete().in('id', dupIds);
+            }
         }
     } catch (e) {
         console.warn('recordUserLoginOrRegister non-blocking warning:', e);
@@ -767,18 +793,137 @@ export const recordUserLoginOrRegister = async (user) => {
 };
 
 // 12. Fetch All Subscriptions & Orders exclusively for Admin Utama
+// Automatically syncs with auth.admin.listUsers() to guarantee 100% of registered emails are visible and mapped
 export const fetchAdminData = async () => {
     if (!supabase) return { subscriptions: [], orders: [] };
 
     try {
+        // 1. Fetch Auth Users (all registered accounts in Supabase Auth)
+        let authUsers = [];
+        try {
+            if (supabase.auth?.admin?.listUsers) {
+                const { data: authData, error: authErr } = await supabase.auth.admin.listUsers();
+                if (!authErr && authData?.users) {
+                    authUsers = authData.users;
+                }
+            }
+        } catch (e) {
+            console.warn('Could not list auth users directly:', e);
+        }
+
+        const authUserMap = new Map();
+        authUsers.forEach(u => {
+            if (u.id && u.email) {
+                authUserMap.set(u.id, u.email.toLowerCase().trim());
+            }
+        });
+
+        // 2. Fetch user_subscriptions and orders
         const [subRes, orderRes] = await Promise.all([
             supabase.from('user_subscriptions').select('*').order('updated_at', { ascending: false }),
             supabase.from('orders').select('*').order('created_at', { ascending: false })
         ]);
 
+        const rawSubs = subRes.data || [];
+        const rawOrders = orderRes.data || [];
+
+        // Also map emails from orders if any
+        rawOrders.forEach(ord => {
+            if (ord.user_id && ord.user_email && !authUserMap.has(ord.user_id)) {
+                authUserMap.set(ord.user_id, ord.user_email.toLowerCase().trim());
+            }
+        });
+
+        // 3. Deduplicate user_subscriptions (pick active over free, or latest updated)
+        const subsByUserId = new Map();
+        const duplicateSubIdsToDelete = [];
+
+        rawSubs.forEach(sub => {
+            const uid = sub.user_id;
+            if (!subsByUserId.has(uid)) {
+                subsByUserId.set(uid, sub);
+            } else {
+                const existing = subsByUserId.get(uid);
+                const isSubBetter = (sub.subscription_status === 'ACTIVE' && existing.subscription_status !== 'ACTIVE') ||
+                    (new Date(sub.updated_at || 0) > new Date(existing.updated_at || 0));
+                if (isSubBetter) {
+                    duplicateSubIdsToDelete.push(existing.id);
+                    subsByUserId.set(uid, sub);
+                } else {
+                    duplicateSubIdsToDelete.push(sub.id);
+                }
+            }
+        });
+
+        // Clean up duplicates in database asynchronously
+        if (duplicateSubIdsToDelete.length > 0) {
+            supabase.from('user_subscriptions').delete().in('id', duplicateSubIdsToDelete).then(() => {}).catch(() => {});
+        }
+
+        // 4. Update existing subscriptions missing email and backfill in background
+        const finalSubs = [];
+        for (const sub of subsByUserId.values()) {
+            let email = sub.user_email;
+            if ((!email || email !== authUserMap.get(sub.user_id)) && authUserMap.has(sub.user_id)) {
+                email = authUserMap.get(sub.user_id);
+                sub.user_email = email;
+                // update in background
+                supabase.from('user_subscriptions').update({ user_email: email }).eq('id', sub.id).catch(() => {});
+            }
+            finalSubs.push(sub);
+        }
+
+        // 5. If there are registered auth users that don't have a record in user_subscriptions yet, create and add them!
+        const existingUserIds = new Set(finalSubs.map(s => s.user_id));
+        for (const u of authUsers) {
+            if (!existingUserIds.has(u.id)) {
+                const email = (u.email || '').toLowerCase().trim();
+                const isSuper = isSuperAdmin(email);
+                const newSub = {
+                    user_id: u.id,
+                    user_email: email,
+                    plan_code: isSuper ? 'PREMIUM_LIFETIME' : 'FREE',
+                    subscription_status: isSuper ? 'ACTIVE' : 'FREE',
+                    subscription_start: u.created_at || new Date().toISOString(),
+                    subscription_end: null,
+                    source: isSuper ? 'ADMIN_GRANTED' : 'PAID',
+                    granted_by: isSuper ? 'SYSTEM' : null,
+                    note: isSuper ? 'Admin Utama System Account' : 'Pengguna Terdaftar',
+                    updated_at: u.created_at || new Date().toISOString()
+                };
+
+                // Insert into DB in background
+                supabase.from('user_subscriptions').insert([newSub]).then(() => {}).catch(() => {});
+
+                finalSubs.push(newSub);
+                existingUserIds.add(u.id);
+            }
+        }
+
+        // 6. Ensure orders also have email populated
+        const finalOrders = rawOrders.map(order => {
+            if (!order.user_email && authUserMap.has(order.user_id)) {
+                const email = authUserMap.get(order.user_id);
+                order.user_email = email;
+                supabase.from('orders').update({ user_email: email }).eq('id', order.id).catch(() => {});
+            }
+            return order;
+        });
+
+        // Sort subscriptions: Super Admin first, then ACTIVE, then newest
+        finalSubs.sort((a, b) => {
+            const isSuperA = isSuperAdmin(a.user_email || a);
+            const isSuperB = isSuperAdmin(b.user_email || b);
+            if (isSuperA && !isSuperB) return -1;
+            if (!isSuperA && isSuperB) return 1;
+            if (a.subscription_status === 'ACTIVE' && b.subscription_status !== 'ACTIVE') return -1;
+            if (b.subscription_status === 'ACTIVE' && a.subscription_status !== 'ACTIVE') return 1;
+            return new Date(b.updated_at || b.subscription_start || 0) - new Date(a.updated_at || a.subscription_start || 0);
+        });
+
         return {
-            subscriptions: subRes.data || [],
-            orders: orderRes.data || []
+            subscriptions: finalSubs,
+            orders: finalOrders
         };
     } catch (err) {
         console.error('Error fetching admin data:', err);

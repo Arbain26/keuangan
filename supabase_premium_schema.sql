@@ -87,6 +87,7 @@ alter table public.orders add column if not exists paid_at timestamp with time z
 alter table public.orders add column if not exists expired_at timestamp with time zone;
 alter table public.orders add column if not exists notes text;
 alter table public.user_subscriptions add column if not exists user_email text;
+create unique index if not exists idx_user_subscriptions_user_id_unique on public.user_subscriptions(user_id);
 
 -- Index for user order history
 create index if not exists idx_orders_user_id on public.orders(user_id);
