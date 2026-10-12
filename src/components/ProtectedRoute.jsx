@@ -33,9 +33,9 @@ const ProtectedRoute = ({ children }) => {
 
     if (loading) {
         return (
-            <div className="flex flex-col justify-center items-center h-screen bg-[#0d1117] text-lime-400 font-mono">
-                <div className="w-10 h-10 border-4 border-lime-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="animate-pulse">Memeriksa Sesi...</p>
+            <div className="flex flex-col justify-center items-center h-screen bg-white text-gray-700">
+                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Memeriksa Sesi...</p>
             </div>
         );
     }

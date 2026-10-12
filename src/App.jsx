@@ -69,7 +69,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      <div className="min-h-screen bg-white text-gray-900 font-sans">
         <ErrorBoundary>
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
@@ -98,11 +98,12 @@ function App() {
               <Route
                 path="*"
                 element={
-                  <div className="min-h-screen bg-black text-green-500 flex flex-col items-center justify-center font-['Share_Tech_Mono']">
-                    <h1 className="text-6xl font-bold mb-4 drop-shadow-[0_0_10px_#00ff00]">404</h1>
-                    <p className="text-xl uppercase tracking-widest mb-8">Page Not Found / System Error</p>
-                    <a href="/" className="px-6 py-2 border border-green-500 hover:bg-green-500 hover:text-black transition uppercase">
-                      Return to Dashboard
+                  <div className="min-h-screen bg-white text-gray-800 flex flex-col items-center justify-center p-6 text-center">
+                    <h1 className="text-7xl font-extrabold text-blue-600 mb-3 tracking-tight">404</h1>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Halaman Tidak Ditemukan</h2>
+                    <p className="text-gray-500 max-w-sm mb-6 text-sm">Halaman yang Anda tuju tidak tersedia atau telah dipindahkan.</p>
+                    <a href="/" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition shadow-sm">
+                      Kembali ke Beranda
                     </a>
                   </div>
                 }

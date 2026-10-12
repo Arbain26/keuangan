@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { fetchTransactions, createTransaction, deleteTransaction, updateTransaction, deleteAllTransactions } from '../lib/api';
-import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag, Crown, MessageCircle, Phone, RefreshCw, Users, ShieldCheck, Check, Ban } from 'lucide-react';
+import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag, Crown, MessageCircle, Phone, RefreshCw, Users, ShieldCheck, Check, Ban, Globe } from 'lucide-react';
 import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
 import { scanReceiptImage } from '../utils/receiptScanner';
 import { 
@@ -205,16 +205,16 @@ const parseExcelDate = (val) => {
 };
 
 const CATEGORIES = [
-    { id: 'makanan & minuman', label: 'Makanan & Minuman', icon: '🍔' },
-    { id: 'transportasi', label: 'Transportasi', icon: '🚗' },
-    { id: 'pendidikan', label: 'Pendidikan / Kuliah', icon: '🎓' },
-    { id: 'belanja', label: 'Belanja', icon: '🛍️' },
-    { id: 'hiburan', label: 'Hiburan/Rekreasi', icon: '🎬' },
-    { id: 'utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },
-    { id: 'kesehatan', label: 'Kesehatan', icon: '🏥' },
-    { id: 'gaji', label: 'Gaji/Pendapatan', icon: '💵' },
-    { id: 'investasi', label: 'Investasi', icon: '📈' },
-    { id: 'lainnya', label: 'Lainnya (Kustom)', icon: '📝' }
+    { id: 'makanan & minuman', label: 'Makanan & Minuman (Food & Dining)', icon: '🍔' },
+    { id: 'transportasi', label: 'Transportasi (Transportation)', icon: '🚗' },
+    { id: 'pendidikan', label: 'Pendidikan / Kuliah (Education)', icon: '🎓' },
+    { id: 'belanja', label: 'Belanja (Shopping & Retail)', icon: '🛍️' },
+    { id: 'hiburan', label: 'Hiburan/Rekreasi (Entertainment)', icon: '🎬' },
+    { id: 'utilitas', label: 'Tagihan & Utilitas (Bills & Utilities)', icon: '⚡' },
+    { id: 'kesehatan', label: 'Kesehatan (Health & Medical)', icon: '🏥' },
+    { id: 'gaji', label: 'Gaji/Pendapatan (Salary & Income)', icon: '💵' },
+    { id: 'investasi', label: 'Investasi (Investments)', icon: '📈' },
+    { id: 'lainnya', label: 'Lainnya (Other / Custom)', icon: '📝' }
 ];
 
 const AdminDashboard = () => {
@@ -224,6 +224,74 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [user, setUser] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [currency, setCurrency] = useState(() => {
+        try {
+            return localStorage.getItem('fintrack_currency') || 'IDR';
+        } catch {
+            return 'IDR';
+        }
+    });
+    const exchangeRate = 16200; // 1 USD = 16,200 IDR
+
+    const handleSetCurrency = (newCurr) => {
+        if (newCurr === currency) return;
+        setCurrency(newCurr);
+        try {
+            localStorage.setItem('fintrack_currency', newCurr);
+        } catch {}
+
+        // Seamlessly convert currently typed amount in form if present
+        setFormData(prev => {
+            if (!prev.amount) return prev;
+            const cleanDigits = Number(prev.amount.toString().replace(/\D/g, '')) || 0;
+            if (cleanDigits === 0) return prev;
+            if (newCurr === 'USD') {
+                const usd = Math.round(cleanDigits / exchangeRate);
+                return { ...prev, amount: usd > 0 ? formatNumberInput(usd) : '1' };
+            } else {
+                const idr = Math.round(cleanDigits * exchangeRate);
+                return { ...prev, amount: formatNumberInput(idr) };
+            }
+        });
+    };
+
+    const displayCurrency = (amount) => {
+        if (amount === null || amount === undefined || isNaN(amount)) {
+            return currency === 'USD' ? '$0.00' : 'Rp0';
+        }
+        if (currency === 'USD') {
+            const usdVal = Number(amount) / exchangeRate;
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(usdVal);
+        }
+        return formatCurrency(amount);
+    };
+
+    const displayDate = (dateString) => {
+        if (!dateString) return '-';
+        const parsed = parseSafeDate(dateString);
+        if (!parsed || isNaN(parsed.getTime())) return formatDate(dateString);
+        return parsed.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    const userTimezoneLabel = (() => {
+        try {
+            const offsetMin = -currentTime.getTimezoneOffset();
+            const sign = offsetMin >= 0 ? '+' : '-';
+            const hours = Math.floor(Math.abs(offsetMin) / 60);
+            return `UTC${sign}${hours}`;
+        } catch {
+            return 'UTC';
+        }
+    })();
 
     // Transaction Form State
     const [formData, setFormData] = useState({
@@ -539,7 +607,8 @@ const AdminDashboard = () => {
         e.preventDefault();
         if (!formData.amount || !formData.date || !formData.category) return;
         
-        const amountCleaned = Number(formData.amount.toString().replace(/\D/g, '')) || 0;
+        const rawDigits = Number(formData.amount.toString().replace(/\D/g, '')) || 0;
+        const amountCleaned = currency === 'USD' ? Math.round(rawDigits * exchangeRate) : rawDigits;
         if (!editingId) {
             const access = await checkFeatureAccess(user, 'transaction', transactions.length);
             if (!access.allowed) {
@@ -599,7 +668,7 @@ const AdminDashboard = () => {
         setFormData({
             type: transaction.type,
             category: transaction.category || '',
-            amount: formatNumberInput(transaction.amount) || '',
+            amount: formatNumberInput(currency === 'USD' ? Math.round(Number(transaction.amount) / exchangeRate) : transaction.amount) || '',
             description: transaction.description || '',
             date: transaction.date || new Date().toISOString().split('T')[0]
         });
@@ -671,6 +740,11 @@ const AdminDashboard = () => {
 
     const exportToExcel = async () => {
         try {
+            const isUsd = currency === 'USD';
+            const numFmt = isUsd ? '$#,##0.00' : '#,##0';
+            const incomeLabel = isUsd ? 'Income' : 'Pemasukan';
+            const expenseLabel = isUsd ? 'Expense' : 'Pengeluaran';
+
             // ── 1. Aggregate category spending for the chart ──
             const categoryTotals = {};
             filteredTransactions
@@ -683,19 +757,19 @@ const AdminDashboard = () => {
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 8);
 
-            // ── 2. Render chart on a hidden off-screen canvas ──
+            // ── 2. Render chart on hidden off-screen canvas ──
             let imageBase64 = null;
             if (sortedCategories.length > 0) {
                 const canvas = document.createElement('canvas');
-                canvas.width = 620;
-                canvas.height = 420;
+                canvas.width = 640;
+                canvas.height = 360;
                 canvas.style.position = 'absolute';
                 canvas.style.left = '-9999px';
                 document.body.appendChild(canvas);
 
                 const chartColors = [
-                    '#6366f1','#3b82f6','#f59e0b','#8b5cf6',
-                    '#ec4899','#ef4444','#06b6d4','#6b7280'
+                    '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
+                    '#f59e0b', '#ec4899', '#8b5cf6', '#10b981'
                 ];
 
                 const chartInstance = new ChartJS(canvas.getContext('2d'), {
@@ -705,10 +779,10 @@ const AdminDashboard = () => {
                             cat.charAt(0).toUpperCase() + cat.slice(1)
                         ),
                         datasets: [{
-                            label: 'Total Pengeluaran (Rp)',
-                            data: sortedCategories.map(([, amt]) => amt),
+                            label: isUsd ? 'Expenses (USD)' : 'Pengeluaran (Rp)',
+                            data: sortedCategories.map(([, amt]) => isUsd ? +(amt / exchangeRate).toFixed(2) : amt),
                             backgroundColor: chartColors.slice(0, sortedCategories.length),
-                            borderRadius: 5,
+                            borderRadius: 6,
                         }]
                     },
                     options: {
@@ -719,7 +793,7 @@ const AdminDashboard = () => {
                             legend: { display: false },
                             title: {
                                 display: true,
-                                text: 'Pengeluaran Terbanyak per Kategori',
+                                text: isUsd ? 'Top Expenses by Category' : 'Pengeluaran Terbanyak per Kategori',
                                 font: { size: 14, weight: 'bold' },
                                 padding: { bottom: 12 }
                             }
@@ -727,96 +801,373 @@ const AdminDashboard = () => {
                         scales: {
                             x: {
                                 ticks: {
-                                    callback: (v) =>
-                                        'Rp ' + Number(v).toLocaleString('id-ID')
+                                    callback: (v) => isUsd ? '$' + Number(v).toLocaleString('en-US') : 'Rp ' + Number(v).toLocaleString('id-ID')
                                 },
-                                grid: { color: '#f3f4f6' }
+                                grid: { color: '#f1f5f9' }
                             },
                             y: { grid: { display: false } }
                         }
                     }
                 });
 
-                // Allow canvas to finish rendering
                 await new Promise(r => setTimeout(r, 250));
                 imageBase64 = canvas.toDataURL('image/png').split(',')[1];
                 chartInstance.destroy();
                 document.body.removeChild(canvas);
             }
 
-            // ── 3. Build workbook with ExcelJS ──
+            // ── 3. Build Multi-Sheet Workbook with Formulas ──
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Financial Report');
+            workbook.creator = 'FinTrack Financial Intelligence';
+            workbook.lastModifiedBy = user?.email || 'FinTrack Admin';
+            workbook.created = new Date();
+            workbook.modified = new Date();
 
-            const borderStyle = {
-                top:    { style: 'thin', color: { argb: 'FFAAAAAA' } },
-                bottom: { style: 'thin', color: { argb: 'FFAAAAAA' } },
-                left:   { style: 'thin', color: { argb: 'FFAAAAAA' } },
-                right:  { style: 'thin', color: { argb: 'FFAAAAAA' } },
+            const thinBorder = {
+                top:    { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                left:   { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right:  { style: 'thin', color: { argb: 'FFCBD5E1' } },
             };
 
-            // Fixed column widths
-            worksheet.columns = [
-                { header: 'Tanggal',    key: 'tanggal',   width: 22 },
-                { header: 'Tipe',       key: 'tipe',      width: 14 },
-                { header: 'Kategori',   key: 'kategori',  width: 22 },
-                { header: 'Nominal',    key: 'nominal',   width: 18 },
-                { header: 'Keterangan', key: 'keterangan',width: 32 },
-            ];
+            const doubleBottomBorder = {
+                top:    { style: 'thin', color: { argb: 'FF475569' } },
+                bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+                left:   { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right:  { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            };
 
-            // Style header row
-            const headerRow = worksheet.getRow(1);
-            headerRow.height = 24;
-            ['A','B','C','D','E'].forEach((col, i) => {
-                const cell = worksheet.getCell(`${col}1`);
-                cell.font  = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 11 };
-                cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
-                cell.alignment = { horizontal: i === 3 ? 'right' : 'center', vertical: 'middle' };
-                cell.border = borderStyle;
+            // ══════════════════════════════════════════════════════
+            // SHEET 1: EXECUTIVE FINANCIAL SUMMARY & CHARTS
+            // ══════════════════════════════════════════════════════
+            const summarySheet = workbook.addWorksheet(isUsd ? 'Executive Summary' : 'Ringkasan Eksekutif');
+            summarySheet.views = [{ showGridLines: true }];
+
+            // Title Banner
+            summarySheet.mergeCells('A1:H1');
+            const titleCell = summarySheet.getCell('A1');
+            titleCell.value = 'FINTRACK FINANCIAL INTELLIGENCE REPORT';
+            titleCell.font = { name: 'Arial', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+            titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+            titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            summarySheet.getRow(1).height = 36;
+
+            // Subtitle metadata
+            summarySheet.mergeCells('A2:H2');
+            const subTitleCell = summarySheet.getCell('A2');
+            subTitleCell.value = `Export Date: ${new Date().toLocaleDateString('en-GB')} | Currency: ${currency} | User: ${user?.email || 'FinTrack User'}`;
+            subTitleCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
+            subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            summarySheet.getRow(2).height = 20;
+
+            // KPI Cards Section Header
+            summarySheet.mergeCells('A4:H4');
+            const kpiHeader = summarySheet.getCell('A4');
+            kpiHeader.value = isUsd ? 'KEY FINANCIAL METRICS (REAL-TIME EXCEL FORMULAS)' : 'METRIK KEUANGAN UTAMA (RUMUS EXCEL REAL-TIME)';
+            kpiHeader.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+            summarySheet.getRow(4).height = 20;
+
+            const totalRowsData = filteredTransactions.length;
+            const dataEndRow = Math.max(totalRowsData + 1, 2);
+            const dataSheetRef = `'Data Transaksi'`;
+
+            // Calculate precomputed values for fallback results
+            const calcTotalIncome = filteredTransactions
+                .filter(t => t.type === 'pemasukan')
+                .reduce((s, t) => s + (isUsd ? +(Number(t.amount) / exchangeRate) : Number(t.amount)), 0);
+
+            const calcTotalExpense = filteredTransactions
+                .filter(t => t.type === 'pengeluaran')
+                .reduce((s, t) => s + (isUsd ? +(Number(t.amount) / exchangeRate) : Number(t.amount)), 0);
+
+            const calcNet = calcTotalIncome - calcTotalExpense;
+
+            // KPI Card 1: Total Revenue (A5:B6)
+            summarySheet.mergeCells('A5:B5');
+            summarySheet.getCell('A5').value = isUsd ? 'TOTAL REVENUE (INCOME)' : 'TOTAL PEMASUKAN';
+            summarySheet.getCell('A5').font = { size: 9, bold: true, color: { argb: 'FF065F46' } };
+            summarySheet.getCell('A5').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+            summarySheet.getCell('A5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+            summarySheet.mergeCells('A6:B6');
+            const revValCell = summarySheet.getCell('A6');
+            revValCell.value = {
+                formula: `SUMIF(${dataSheetRef}!C$2:C$${dataEndRow}, "${incomeLabel}", ${dataSheetRef}!E$2:E$${dataEndRow})`,
+                result: calcTotalIncome
+            };
+            revValCell.font = { size: 14, bold: true, color: { argb: 'FF047857' } };
+            revValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } };
+            revValCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            revValCell.numFmt = numFmt;
+
+            // KPI Card 2: Total Expenses (C5:D6)
+            summarySheet.mergeCells('C5:D5');
+            summarySheet.getCell('C5').value = isUsd ? 'TOTAL EXPENSES' : 'TOTAL PENGELUARAN';
+            summarySheet.getCell('C5').font = { size: 9, bold: true, color: { argb: 'FF9F1239' } };
+            summarySheet.getCell('C5').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
+            summarySheet.getCell('C5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+            summarySheet.mergeCells('C6:D6');
+            const expValCell = summarySheet.getCell('C6');
+            expValCell.value = {
+                formula: `SUMIF(${dataSheetRef}!C$2:C$${dataEndRow}, "${expenseLabel}", ${dataSheetRef}!E$2:E$${dataEndRow})`,
+                result: calcTotalExpense
+            };
+            expValCell.font = { size: 14, bold: true, color: { argb: 'FFBE123C' } };
+            expValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF1F2' } };
+            expValCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            expValCell.numFmt = numFmt;
+
+            // KPI Card 3: Net Cashflow (E5:F6)
+            summarySheet.mergeCells('E5:F5');
+            summarySheet.getCell('E5').value = isUsd ? 'NET CASHFLOW (BALANCE)' : 'SALDO BERSIH (NET)';
+            summarySheet.getCell('E5').font = { size: 9, bold: true, color: { argb: 'FF1E40AF' } };
+            summarySheet.getCell('E5').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+            summarySheet.getCell('E5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+            summarySheet.mergeCells('E6:F6');
+            const netValCell = summarySheet.getCell('E6');
+            netValCell.value = {
+                formula: 'A6-C6',
+                result: calcNet
+            };
+            netValCell.font = { size: 14, bold: true, color: { argb: 'FF1D4ED8' } };
+            netValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+            netValCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            netValCell.numFmt = numFmt;
+
+            // KPI Card 4: Count of Transactions (G5:H6)
+            summarySheet.mergeCells('G5:H5');
+            summarySheet.getCell('G5').value = isUsd ? 'TRANSACTIONS COUNT' : 'JUMLAH TRANSAKSI';
+            summarySheet.getCell('G5').font = { size: 9, bold: true, color: { argb: 'FF78350F' } };
+            summarySheet.getCell('G5').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+            summarySheet.getCell('G5').alignment = { horizontal: 'center', vertical: 'middle' };
+
+            summarySheet.mergeCells('G6:H6');
+            const countValCell = summarySheet.getCell('G6');
+            countValCell.value = {
+                formula: `COUNTA(${dataSheetRef}!B$2:B$${dataEndRow})`,
+                result: totalRowsData
+            };
+            countValCell.font = { size: 14, bold: true, color: { argb: 'FFB45309' } };
+            countValCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } };
+            countValCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            countValCell.numFmt = '#,##0';
+
+            ['A5','B5','A6','B6','C5','D5','C6','D6','E5','F5','E6','F6','G5','H5','G6','H6'].forEach(addr => {
+                summarySheet.getCell(addr).border = thinBorder;
             });
 
-            // Add and style data rows
-            filteredTransactions.forEach((t, idx) => {
-                const rowData = {
-                    tanggal:   formatDate(t.date),
-                    tipe:      t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran',
-                    kategori:  t.category,
-                    nominal:   Number(t.amount),
-                    keterangan: t.description || '-',
+            // Section 2: Category Breakdown Table
+            const catStartRow = 9;
+            summarySheet.mergeCells(`A${catStartRow}:D${catStartRow}`);
+            const catHeaderCell = summarySheet.getCell(`A${catStartRow}`);
+            catHeaderCell.value = isUsd ? 'EXPENSE BREAKDOWN BY CATEGORY' : 'RINCIAN PENGELUARAN PER KATEGORI';
+            catHeaderCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF334155' } };
+            summarySheet.getRow(catStartRow).height = 22;
+
+            // Category Table Headers
+            const catHeaderRow = catStartRow + 1;
+            summarySheet.getRow(catHeaderRow).values = [
+                '#',
+                isUsd ? 'Category' : 'Kategori Pos',
+                isUsd ? 'Total Amount' : 'Total Pengeluaran',
+                isUsd ? '% Share' : '% dari Total'
+            ];
+            summarySheet.getRow(catHeaderRow).height = 20;
+
+            ['A','B','C','D'].forEach(col => {
+                const c = summarySheet.getCell(`${col}${catHeaderRow}`);
+                c.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+                c.alignment = { horizontal: (col === 'C' || col === 'D') ? 'right' : 'center', vertical: 'middle' };
+                c.border = thinBorder;
+            });
+
+            let currentCatRow = catHeaderRow + 1;
+            sortedCategories.forEach(([cat, rawAmt], idx) => {
+                const amtVal = isUsd ? +(rawAmt / exchangeRate).toFixed(2) : rawAmt;
+                const r = summarySheet.getRow(currentCatRow);
+                r.height = 18;
+
+                // Index
+                const cellIdx = summarySheet.getCell(`A${currentCatRow}`);
+                cellIdx.value = idx + 1;
+                cellIdx.alignment = { horizontal: 'center' };
+
+                // Category Name
+                const cellCat = summarySheet.getCell(`B${currentCatRow}`);
+                cellCat.value = cat.charAt(0).toUpperCase() + cat.slice(1);
+                cellCat.font = { bold: true };
+
+                // Amount Formula: SUMIFS
+                const cellAmt = summarySheet.getCell(`C${currentCatRow}`);
+                cellAmt.value = {
+                    formula: `SUMIFS(${dataSheetRef}!E$2:E$${dataEndRow}, ${dataSheetRef}!C$2:C$${dataEndRow}, "${expenseLabel}", ${dataSheetRef}!D$2:D$${dataEndRow}, "${cat}")`,
+                    result: amtVal
                 };
-                const row = worksheet.addRow(rowData);
-                row.height = 18;
-                const fillArgb = idx % 2 === 0 ? 'FFFFFFFF' : 'FFEFF6FF';
+                cellAmt.numFmt = numFmt;
+                cellAmt.alignment = { horizontal: 'right' };
+
+                // Percent Share Formula
+                const cellPct = summarySheet.getCell(`D${currentCatRow}`);
+                cellPct.value = {
+                    formula: `C${currentCatRow}/C$6`,
+                    result: calcTotalExpense > 0 ? (amtVal / calcTotalExpense) : 0
+                };
+                cellPct.numFmt = '0.0%';
+                cellPct.alignment = { horizontal: 'right' };
+
+                ['A','B','C','D'].forEach(col => {
+                    const cell = summarySheet.getCell(`${col}${currentCatRow}`);
+                    cell.border = thinBorder;
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: idx % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC' } };
+                });
+
+                currentCatRow++;
+            });
+
+            // Category Total Row
+            const catTotalRow = currentCatRow;
+            summarySheet.getCell(`A${catTotalRow}`).value = '';
+            summarySheet.getCell(`B${catTotalRow}`).value = isUsd ? 'TOTAL EXPENSES' : 'TOTAL PENGELUARAN';
+            summarySheet.getCell(`B${catTotalRow}`).font = { bold: true, size: 9 };
+
+            const catTotalAmtCell = summarySheet.getCell(`C${catTotalRow}`);
+            catTotalAmtCell.value = {
+                formula: `SUM(C${catHeaderRow + 1}:C${catTotalRow - 1})`,
+                result: calcTotalExpense
+            };
+            catTotalAmtCell.font = { bold: true };
+            catTotalAmtCell.numFmt = numFmt;
+            catTotalAmtCell.alignment = { horizontal: 'right' };
+
+            const catTotalPctCell = summarySheet.getCell(`D${catTotalRow}`);
+            catTotalPctCell.value = {
+                formula: `SUM(D${catHeaderRow + 1}:D${catTotalRow - 1})`,
+                result: 1.0
+            };
+            catTotalPctCell.font = { bold: true };
+            catTotalPctCell.numFmt = '0.0%';
+            catTotalPctCell.alignment = { horizontal: 'right' };
+
+            ['A','B','C','D'].forEach(col => {
+                const cell = summarySheet.getCell(`${col}${catTotalRow}`);
+                cell.border = doubleBottomBorder;
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+            });
+
+            // Set column widths for Summary Sheet
+            summarySheet.getColumn('A').width = 6;
+            summarySheet.getColumn('B').width = 24;
+            summarySheet.getColumn('C').width = 20;
+            summarySheet.getColumn('D').width = 16;
+            summarySheet.getColumn('E').width = 16;
+            summarySheet.getColumn('F').width = 16;
+            summarySheet.getColumn('G').width = 16;
+            summarySheet.getColumn('H').width = 16;
+
+            // Embed Chart image to the right of Category Table (Column F)
+            if (imageBase64) {
+                const imageId = workbook.addImage({
+                    base64: imageBase64,
+                    extension: 'png',
+                });
+                summarySheet.addImage(imageId, {
+                    tl: { col: 4.8, row: 8 },
+                    br: { col: 8.5, row: Math.max(currentCatRow + 5, 24) },
+                    editAs: 'oneCell',
+                });
+            }
+
+            // ══════════════════════════════════════════════════════
+            // SHEET 2: RAW TRANSACTIONS DATA (DATA TRANSAKSI)
+            // ══════════════════════════════════════════════════════
+            const dataSheet = workbook.addWorksheet(isUsd ? 'Transactions Data' : 'Data Transaksi');
+            dataSheet.views = [{ showGridLines: true }];
+
+            // Header columns
+            dataSheet.columns = [
+                { header: isUsd ? 'No' : 'No',                      key: 'no',          width: 8 },
+                { header: isUsd ? 'Date' : 'Tanggal',               key: 'tanggal',     width: 18 },
+                { header: isUsd ? 'Type' : 'Tipe',                  key: 'tipe',        width: 16 },
+                { header: isUsd ? 'Category' : 'Kategori',          key: 'kategori',    width: 24 },
+                { header: isUsd ? 'Amount' : 'Nominal',             key: 'nominal',     width: 20 },
+                { header: isUsd ? 'Description' : 'Keterangan',     key: 'keterangan',  width: 36 },
+            ];
+
+            // Style Table Header Row
+            const dataHeaderRow = dataSheet.getRow(1);
+            dataHeaderRow.height = 24;
+            ['A','B','C','D','E','F'].forEach((col, i) => {
+                const cell = dataSheet.getCell(`${col}1`);
+                cell.font  = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 10 };
+                cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+                cell.alignment = { horizontal: i === 4 ? 'right' : (i === 0 || i === 1 || i === 2 ? 'center' : 'left'), vertical: 'middle' };
+                cell.border = thinBorder;
+            });
+
+            // Populate Data Rows
+            let grandTotalRaw = 0;
+            filteredTransactions.forEach((t, idx) => {
+                const amtNumber = isUsd ? +(Number(t.amount) / exchangeRate).toFixed(2) : Number(t.amount);
+                grandTotalRaw += amtNumber;
+
+                const rowData = {
+                    no:         idx + 1,
+                    tanggal:    displayDate(t.date),
+                    tipe:       t.type === 'pemasukan' ? incomeLabel : expenseLabel,
+                    kategori:   t.category ? (t.category.charAt(0).toUpperCase() + t.category.slice(1)) : 'Lainnya',
+                    nominal:    amtNumber,
+                    keterangan: (t.description && t.description !== '-') ? t.description : '-',
+                };
+                const row = dataSheet.addRow(rowData);
+                row.height = 19;
+                const fillArgb = idx % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
 
                 row.eachCell({ includeEmpty: true }, (cell, colNum) => {
                     cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
-                    cell.border = borderStyle;
-                    cell.font   = { name: 'Arial', size: 10, color: { argb: 'FF111827' } };
-                    if (colNum === 1 || colNum === 2) {
+                    cell.border = thinBorder;
+                    cell.font   = { name: 'Arial', size: 10, color: { argb: 'FF0F172A' } };
+                    if (colNum === 1 || colNum === 2 || colNum === 3) {
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    } else if (colNum === 4) {
+                    } else if (colNum === 5) {
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
-                        cell.numFmt = '#,##0';
+                        cell.numFmt = numFmt;
                     } else {
                         cell.alignment = { horizontal: 'left', vertical: 'middle' };
                     }
                 });
             });
 
-            // ── 4. Embed chart image to the right of the table ──
-            if (imageBase64) {
-                const imageId = workbook.addImage({
-                    base64: imageBase64,
-                    extension: 'png',
-                });
-                const totalRows = filteredTransactions.length + 1;
-                const chartRows = Math.max(totalRows, 20);
-                worksheet.addImage(imageId, {
-                    tl: { col: 6.2, row: 0.5 },
-                    br: { col: 14.8, row: chartRows + 0.5 },
-                    editAs: 'oneCell',
-                });
-            }
+            // Table Footer: Grand Total Row with SUM Formula
+            const totalRowIndex = filteredTransactions.length + 2;
+            const footerRow = dataSheet.getRow(totalRowIndex);
+            footerRow.height = 22;
+
+            dataSheet.mergeCells(`A${totalRowIndex}:D${totalRowIndex}`);
+            const grandTotalLabel = dataSheet.getCell(`A${totalRowIndex}`);
+            grandTotalLabel.value = isUsd ? 'GRAND TOTAL (KESELURUHAN)' : 'TOTAL KESELURUHAN (GRAND TOTAL)';
+            grandTotalLabel.font = { bold: true, name: 'Arial', size: 10, color: { argb: 'FF0F172A' } };
+            grandTotalLabel.alignment = { horizontal: 'center', vertical: 'middle' };
+
+            const grandTotalCell = dataSheet.getCell(`E${totalRowIndex}`);
+            grandTotalCell.value = {
+                formula: `SUM(E2:E${totalRowIndex - 1})`,
+                result: grandTotalRaw
+            };
+            grandTotalCell.font = { bold: true, name: 'Arial', size: 11, color: { argb: 'FF1D4ED8' } };
+            grandTotalCell.numFmt = numFmt;
+            grandTotalCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+            const emptyCellF = dataSheet.getCell(`F${totalRowIndex}`);
+            emptyCellF.value = '';
+
+            ['A','B','C','D','E','F'].forEach(col => {
+                const c = dataSheet.getCell(`${col}${totalRowIndex}`);
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                c.border = doubleBottomBorder;
+            });
 
             // ── 5. Write and download ──
             const buffer = await workbook.xlsx.writeBuffer();
@@ -826,13 +1177,14 @@ const AdminDashboard = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Financial_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            a.download = `FinTrack_Report_${currency}_${new Date().toISOString().split('T')[0]}.xlsx`;
             a.click();
             URL.revokeObjectURL(url);
+            showToast('Laporan Excel profesional & ber-rumus berhasil diunduh!');
 
         } catch (error) {
             console.error('Error exporting to excel:', error);
-            showToast('Gagal mengekspor laporan.', 'error');
+            showToast('Gagal mengekspor laporan excel.', 'error');
         }
     };
 
@@ -845,10 +1197,13 @@ const AdminDashboard = () => {
             const arrayBuffer = await file.arrayBuffer();
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(arrayBuffer);
-            const worksheet = workbook.worksheets[0]; // Get first sheet
+
+            // Cerdas mencari worksheet transaksi (bisa Data Transaksi / Transactions Data atau sheet 0)
+            let worksheet = workbook.getWorksheet('Data Transaksi') || 
+                            workbook.getWorksheet('Transactions Data') || 
+                            workbook.worksheets[0];
             
             const transactionsToImport = [];
-            // Gunakan Set untuk mendeteksi duplikat (baik dari DB maupun dalam file excel itu sendiri)
             const seenSignatures = new Set(
                 transactions.map(t => {
                     const tDate = t.date ? t.date.split('T')[0] : '';
@@ -861,22 +1216,23 @@ const AdminDashboard = () => {
             );
             let skippedCount = 0;
 
-            // Indeks kolom bawaan (jika header tidak ditemukan)
             let colIndices = {
-                date: 1,
-                type: 2,
-                category: 3,
-                amount: 4,
-                description: 5
+                date: 2,
+                type: 3,
+                category: 4,
+                amount: 5,
+                description: 6
             };
+            let headerFound = false;
 
             worksheet.eachRow((row, rowNumber) => {
-                if (rowNumber === 1) {
-                    // Cari indeks kolom secara dinamis berdasarkan nama header
+                if (!headerFound) {
+                    let hasHeaderMarker = false;
                     row.eachCell((cell, colNumber) => {
                         const headerText = (getCellValue(cell) || '').toString().toLowerCase().trim();
                         if (headerText.includes('tanggal') || headerText.includes('date')) {
                             colIndices.date = colNumber;
+                            hasHeaderMarker = true;
                         } else if (headerText.includes('tipe') || headerText.includes('type')) {
                             colIndices.type = colNumber;
                         } else if (headerText.includes('kategori') || headerText.includes('category')) {
@@ -887,15 +1243,26 @@ const AdminDashboard = () => {
                             colIndices.description = colNumber;
                         }
                     });
-                    return; // Lewati baris header
+                    if (hasHeaderMarker) {
+                        headerFound = true;
+                    }
+                    return;
                 }
                 
+                const typeVal = getCellValue(row.getCell(colIndices.type));
+                const typeStr = (typeVal || '').toString().toLowerCase();
+
+                // Abaikan baris total / footer
+                const descVal = (getCellValue(row.getCell(colIndices.description)) || '').toString().toLowerCase();
+                const firstColVal = (getCellValue(row.getCell(1)) || '').toString().toLowerCase();
+                if (firstColVal.includes('total') || descVal.includes('total')) {
+                    return;
+                }
+
                 const dateVal = getCellValue(row.getCell(colIndices.date));
                 const dateStr = parseExcelDate(dateVal);
 
-                const typeVal = getCellValue(row.getCell(colIndices.type));
-                const typeStr = (typeVal || '').toString().toLowerCase();
-                const type = typeStr.includes('pemasukan') ? 'pemasukan' : 'pengeluaran';
+                const type = (typeStr.includes('pemasukan') || typeStr.includes('income')) ? 'pemasukan' : 'pengeluaran';
                 
                 const categoryVal = getCellValue(row.getCell(colIndices.category));
                 const category = normalizeCategory(categoryVal, type);
@@ -905,16 +1272,19 @@ const AdminDashboard = () => {
                 if (typeof amountVal === 'number') {
                     amount = amountVal;
                 } else if (amountVal) {
-                    // Bersihkan pemformatan dari string (seperti Rp, titik, koma, spasi)
                     const cleaned = amountVal.toString().replace(/\D/g, '');
                     amount = Number(cleaned) || 0;
                 }
-                
-                const descriptionVal = getCellValue(row.getCell(colIndices.description));
-                const description = (descriptionVal || '').toString().trim();
-                
-                if (amount > 0) {
-                    const signature = `${dateStr}_${type}_${category}_${amount}_${description.toLowerCase()}`;
+
+                if (currency === 'USD' && amount < 1000 && amount > 0) {
+                    // Jika diimpor dari USD amount, konversi ke basis IDR jika nilai kecil
+                    amount = Math.round(amount * exchangeRate);
+                }
+
+                const description = getCellValue(row.getCell(colIndices.description)) || '-';
+
+                if (amount > 0 && dateStr) {
+                    const signature = `${dateStr}_${type}_${category}_${amount}_${description.trim().toLowerCase()}`;
                     if (seenSignatures.has(signature)) {
                         skippedCount++;
                     } else {
@@ -930,21 +1300,31 @@ const AdminDashboard = () => {
                 }
             });
 
+            if (transactionsToImport.length === 0) {
+                if (skippedCount > 0) {
+                    showToast(`Semua (${skippedCount}) transaksi di file Excel sudah ada di sistem (duplikat diabaikan).`, 'error');
+                } else {
+                    showToast('Tidak ada transaksi valid yang ditemukan dalam file.', 'error');
+                }
+                return;
+            }
+
             for (const t of transactionsToImport) {
                 await createTransaction(t);
             }
-            
-            let message = `${transactionsToImport.length} data baru berhasil diimpor!`;
-            if (skippedCount > 0) {
-                message += ` (${skippedCount} data ganda dilewati)`;
-            }
-            showToast(message);
-            
+
             const data = await fetchTransactions();
             setTransactions(Array.isArray(data) ? data : []);
+            
+            let successMsg = `Berhasil mengimpor ${transactionsToImport.length} transaksi!`;
+            if (skippedCount > 0) {
+                successMsg += ` (${skippedCount} duplikat diabaikan)`;
+            }
+            showToast(successMsg);
+
         } catch (error) {
-            console.error("Error importing excel", error);
-            showToast('Gagal membaca file Excel.', 'error');
+            console.error('Error importing excel:', error);
+            showToast('Gagal memproses file Excel.', 'error');
         } finally {
             setIsSubmitting(false);
             e.target.value = null; // Reset input
@@ -1163,7 +1543,7 @@ const AdminDashboard = () => {
                         const value = context.raw;
                         const total = doughnutData.reduce((a, b) => a + b, 0);
                         const percentage = ((value / total) * 100).toFixed(1);
-                        return `${context.label}: ${formatCurrency(value)} (${percentage}%)`;
+                        return `${context.label}: ${displayCurrency(value)} (${percentage}%)`;
                     }
                 }
             }
@@ -1183,14 +1563,32 @@ const AdminDashboard = () => {
                 borderWidth: 1,
                 padding: 12,
                 callbacks: {
-                    label: (context) => formatCurrency(Math.abs(context.raw))
+                    label: (context) => {
+                        const val = context.raw;
+                        if (val === 0) return displayCurrency(0);
+                        const sign = val > 0 ? '+' : '-';
+                        return `${sign} ${displayCurrency(Math.abs(val))}`;
+                    }
                 }
             }
         },
         scales: {
             y: {
                 grid: { color: '#f3f4f6', borderDash: [5, 5] },
-                ticks: { color: '#6b7280' },
+                ticks: {
+                    color: '#6b7280',
+                    callback: (val) => {
+                        if (currency === 'USD') {
+                            const usd = Number(val) / exchangeRate;
+                            const absUsd = Math.abs(usd);
+                            const sign = usd < 0 ? '-' : '';
+                            return `${sign}${absUsd >= 1000 ? (absUsd / 1000).toFixed(1) + 'k' : absUsd.toFixed(0)}`;
+                        }
+                        const absVal = Math.abs(Number(val));
+                        const sign = Number(val) < 0 ? '-' : '';
+                        return `${sign}Rp${absVal >= 1000000 ? (absVal / 1000000).toFixed(1) + 'jt' : absVal >= 1000 ? (absVal / 1000).toFixed(0) + 'rb' : absVal}`;
+                    }
+                },
                 border: { display: false }
             },
             x: {
@@ -1201,46 +1599,64 @@ const AdminDashboard = () => {
         }
     };
 
-    const SidebarItem = ({ id, icon: Icon, label }) => (
+    const SidebarItem = ({ id, icon: Icon, label, sublabel }) => (
         <button
             onClick={() => { setActiveTab(id); setIsSidebarOpen(false); }}
-            className={`w-full text-left px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center gap-3 mb-1 ${activeTab === id
-                ? 'bg-blue-50 text-blue-600 shadow-sm border-l-4 border-blue-500'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all flex items-center justify-between mb-1 group ${activeTab === id
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
         >
-            <Icon className={`w-5 h-5 ${activeTab === id ? 'text-blue-500' : 'text-gray-400'}`} />
-            {label}
+            <div className="flex items-center gap-3">
+                <Icon className={`w-4 h-4 ${activeTab === id ? 'text-white' : 'text-gray-400 group-hover:text-gray-700'}`} />
+                <div>
+                    <span className="block leading-tight">{label}</span>
+                    {sublabel && (
+                        <span className={`block text-[10px] font-normal leading-tight mt-0.5 ${activeTab === id ? 'text-blue-100' : 'text-gray-400'}`}>
+                            {sublabel}
+                        </span>
+                    )}
+                </div>
+            </div>
+            {activeTab === id && (
+                <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
+            )}
         </button>
     );
 
     const FilterButtons = () => (
-        <div className="flex flex-wrap gap-2 mb-4">
-            {[
-                { id: 'all', label: 'Semua' },
-                { id: 'week', label: 'Minggu Ini' },
-                { id: 'month', label: 'Bulan Ini' },
-                { id: 'year', label: 'Tahun Ini' }
-            ].map((period) => (
-                <button
-                    key={period.id}
-                    onClick={() => setActivePeriod(period.id)}
-                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all border ${activePeriod === period.id
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900'
-                        }`}
-                >
-                    {period.label}
-                </button>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-2 rounded-2xl border border-gray-200/80 shadow-xs">
+            <div className="flex flex-wrap gap-1.5">
+                {[
+                    { id: 'all', label: 'Semua (All)' },
+                    { id: 'week', label: 'Minggu Ini (This Week)' },
+                    { id: 'month', label: 'Bulan Ini (This Month)' },
+                    { id: 'year', label: 'Tahun Ini (This Year)' }
+                ].map((period) => (
+                    <button
+                        key={period.id}
+                        onClick={() => setActivePeriod(period.id)}
+                        className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all ${activePeriod === period.id
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
+                    >
+                        {period.label}
+                    </button>
+                ))}
+            </div>
+            <div className="text-xs text-gray-500 font-medium px-3 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-emerald-500" />
+                <span>{filteredTransactions.length} records</span>
+            </div>
         </div>
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans selection:bg-blue-100 selection:text-blue-900">
+        <div className="min-h-screen bg-gray-50/60 text-gray-800 font-sans selection:bg-blue-100 selection:text-blue-900">
 
             {/* Top Bar */}
-            <header className="fixed top-0 w-full h-16 bg-white border-b border-gray-200/80 z-50 flex items-center justify-between px-4 md:px-6">
+            <header className="fixed top-0 w-full h-16 bg-white/95 backdrop-blur-md border-b border-gray-200/80 z-50 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -1249,39 +1665,83 @@ const AdminDashboard = () => {
                         {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     <div className="flex items-center gap-3">
-                        <img src="/logo.jpg" alt="Logo" className="w-8 h-8 rounded-lg object-cover shadow-sm shadow-blue-500/20" />
+                        <div className="relative">
+                            <img src="/logo.jpg" alt="Logo" className="w-9 h-9 rounded-xl object-cover ring-1 ring-gray-200 shadow-xs" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                        </div>
                         <div>
-                            <h1 className="text-sm font-bold text-gray-900 leading-tight">My Finance</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-sm font-extrabold text-gray-900 tracking-tight leading-tight">FinTrack</h1>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded">PRO</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-medium">Financial Intelligence Workspace</p>
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:flex flex-col items-end mr-2">
-                        <span className="text-xs font-medium text-gray-500">
-                            {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}
+
+                <div className="flex items-center gap-3 md:gap-4">
+                    {/* Live Currency Switcher (IDR / USD) for Foreign Users / WNA */}
+                    <div className="flex items-center bg-gray-100 p-0.5 rounded-xl border border-gray-200/80 shadow-xs">
+                        <button
+                            type="button"
+                            onClick={() => handleSetCurrency('IDR')}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                                currency === 'IDR'
+                                    ? 'bg-white text-blue-600 shadow-xs'
+                                    : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                            title="Format Mata Uang: Rupiah (IDR)"
+                        >
+                            IDR (Rp)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSetCurrency('USD')}
+                            className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                                currency === 'USD'
+                                    ? 'bg-white text-blue-600 shadow-xs'
+                                    : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                            title="Format Mata Uang: US Dollar (USD) - Ramah Pengguna Internasional / WNA"
+                        >
+                            USD ($)
+                        </button>
+                    </div>
+
+                    {/* Clock & Global Timezone */}
+                    <div className="hidden lg:flex flex-col items-end mr-1 text-right">
+                        <span className="text-xs font-semibold text-gray-700">
+                            {currentTime.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
-                        <span className="text-xs font-bold text-gray-700">
-                            {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-gray-400" />
+                            {currentTime.toLocaleTimeString(currency === 'USD' ? 'en-US' : 'id-ID', { hour: '2-digit', minute: '2-digit' })} • {userTimezoneLabel}
                         </span>
                     </div>
-                    <div className="flex items-center gap-3 border-l border-gray-200 pl-4 h-8">
+
+                    {/* Profile & Role */}
+                    <div className="flex items-center gap-3 border-l border-gray-200 pl-3 md:pl-4 h-9">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isAdminUtama ? 'bg-amber-100 border border-amber-300 text-amber-900 shadow-sm' : 'bg-blue-50 border border-blue-100 text-blue-600'
+                            isAdminUtama ? 'bg-amber-100 border border-amber-300 text-amber-900 shadow-xs' : 'bg-blue-50 border border-blue-200 text-blue-600'
                         }`}>
                             {isAdminUtama ? <Crown className="w-4 h-4 text-amber-600" /> : 'MA'}
                         </div>
                         <div className="hidden md:block">
                             <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-bold text-gray-950 capitalize">{user?.user_metadata?.full_name || 'Muhammad Arbain'}</p>
-                                {isAdminUtama && (
-                                    <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 shadow-sm">
-                                        ★ ADMIN UTAMA
+                                <p className="text-xs font-bold text-gray-950 capitalize">{user?.user_metadata?.full_name || 'Administrator'}</p>
+                                {isAdminUtama ? (
+                                    <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-0.5 shadow-xs">
+                                        ★ SUPER ADMIN
+                                    </span>
+                                ) : (
+                                    <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                        PRO MEMBER
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[10px] text-gray-500">{user?.email || 'Administrator'}</p>
+                            <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{user?.email || 'admin@fintrack.id'}</p>
                         </div>
-                        <button onClick={handleLogout} className="ml-2 p-2 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Keluar">
+                        <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Log Out / Keluar">
                             <LogOut className="w-4 h-4" />
                         </button>
                     </div>
@@ -1291,7 +1751,7 @@ const AdminDashboard = () => {
             {/* Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/70 z-[80] md:hidden backdrop-blur-sm transition-opacity duration-300"
+                    className="fixed inset-0 bg-black/60 z-[80] md:hidden backdrop-blur-xs transition-opacity duration-300"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
@@ -1303,87 +1763,113 @@ const AdminDashboard = () => {
                 <aside className={`fixed top-0 left-0 bottom-0 md:relative z-[90] w-72 md:w-64 h-screen md:h-auto bg-white border-r border-gray-200/80 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 flex flex-col overflow-y-auto shadow-2xl md:shadow-none`}>
                     <div className="p-4 flex flex-col h-full">
                         <div className="space-y-1 flex-1">
-                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-2">Menu Utama</p>
-                            <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-                            <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" />
-                            <SidebarItem id="reports" icon={FileText} label="Laporan" />
+                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-2">Main Navigation</p>
+                            <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" sublabel="Overview & Analytics" />
+                            <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" sublabel="Income & Expenses" />
+                            <SidebarItem id="reports" icon={FileText} label="Laporan Keuangan" sublabel="Financial Statements" />
                             {isAdminUtama && (
                                 <button
                                     onClick={() => { setActiveTab('subscriptions'); setIsSidebarOpen(false); }}
-                                    className={`w-full text-left px-4 py-3 text-sm font-medium rounded-lg transition-all flex items-center justify-between mb-1 ${activeTab === 'subscriptions'
-                                        ? 'bg-amber-50 text-amber-700 shadow-sm border-l-4 border-amber-500 font-bold'
-                                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                                    className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold rounded-xl transition-all flex items-center justify-between mb-1 group ${activeTab === 'subscriptions'
+                                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/20'
+                                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <Crown className={`w-5 h-5 ${activeTab === 'subscriptions' ? 'text-amber-500' : 'text-amber-500/80'}`} />
-                                        <span>Kelola Langganan</span>
+                                        <Crown className={`w-4 h-4 ${activeTab === 'subscriptions' ? 'text-slate-950' : 'text-amber-500'}`} />
+                                        <div>
+                                            <span className="block leading-tight">Kelola Langganan</span>
+                                            <span className={`block text-[10px] font-normal leading-tight mt-0.5 ${activeTab === 'subscriptions' ? 'text-amber-950' : 'text-gray-400'}`}>
+                                                Subscription Manager
+                                            </span>
+                                        </div>
                                     </div>
                                     {allOrders.filter(o => o.status === 'PENDING').length > 0 && (
-                                        <span className="bg-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+                                        <span className="bg-amber-950 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-xs">
                                             {allOrders.filter(o => o.status === 'PENDING').length}
                                         </span>
                                     )}
                                 </button>
                             )}
 
-                            <p className="px-4 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-3 mt-5">Paket & Akun</p>
-                            <Link to="/pricing" className="w-full text-left px-4 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 rounded-lg transition-all flex items-center gap-3 mb-1">
-                                <Sparkles className="w-4 h-4 text-amber-500" />
-                                Upgrade / Paket Premium
+                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-5">Subscription & Account</p>
+                            <Link to="/pricing" className="w-full text-left px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/60 rounded-xl transition-all flex items-center gap-2.5 mb-1.5 shadow-2xs">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                                <div>
+                                    <span className="block leading-tight">Upgrade Premium</span>
+                                    <span className="block text-[9px] text-amber-600/80 font-normal">Pricing & Plans</span>
+                                </div>
                             </Link>
-                            <Link to="/my-orders" className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3 mb-1">
+                            <Link to="/my-orders" className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-xl transition-all flex items-center gap-3 mb-1">
                                 <ShoppingBag className="w-4 h-4 text-gray-400" />
-                                Riwayat Pesanan Paket
+                                <div>
+                                    <span className="block leading-tight font-semibold">Pesanan Saya</span>
+                                    <span className="block text-[10px] text-gray-400">Order Invoices</span>
+                                </div>
                             </Link>
-                            <SidebarItem id="profile" icon={User} label="Profil User" />
-                            <Link to="/" target="_blank" className="w-full text-left px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg transition-all flex items-center gap-3">
-                                <ChevronRight className="w-5 h-5 text-gray-400" />
-                                Lihat Website
+                            <SidebarItem id="profile" icon={User} label="Profil Akun" sublabel="Security & Settings" />
+                            <Link to="/" target="_blank" className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-xl transition-all flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Globe className="w-4 h-4 text-gray-400" />
+                                    <div>
+                                        <span className="block leading-tight font-semibold">Portal Publik</span>
+                                        <span className="block text-[10px] text-gray-400">Public Website</span>
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                             </Link>
                         </div>
 
-                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 mt-auto">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                                <div>
-                                    <p className="text-xs font-bold text-gray-900">System Status</p>
-                                    <p className="text-[10px] text-gray-500">All services operational</p>
+                        <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200/70 mt-auto shadow-2xs">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <div className="flex-1">
+                                    <p className="text-[11px] font-bold text-gray-900">Cloud Engine Active</p>
+                                    <p className="text-[9px] text-gray-500">RLS Encryption • 99.9% Uptime</p>
                                 </div>
+                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
                             </div>
                         </div>
                     </div>
                 </aside>
 
                 {/* Main Content Area */}
-                <main className="flex-1 bg-gray-50 p-4 md:p-8">
+                <main className="flex-1 bg-gray-50/60 p-4 md:p-8">
                     <div className="max-w-6xl mx-auto space-y-8">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center min-h-[400px]">
                                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                <p className="text-[#8b949e] animate-pulse">Menyiapkan dashboard...</p>
+                                <p className="text-gray-500 animate-pulse text-sm font-medium">Menyiapkan dashboard FinTrack...</p>
                             </div>
                         ) : (
                             <>
                                 {/* Page Header */}
-                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-6">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200/80 pb-6">
                                     <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                                FINTRACK WORKSPACE
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 font-mono font-medium">
+                                                CURRENCY: {currency}
+                                            </span>
+                                        </div>
+                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">
                                             {{
-                                                dashboard: 'Dashboard Overview',
-                                                transactions: 'Manajemen Transaksi',
-                                                reports: 'Laporan Keuangan',
-                                                subscriptions: 'Manajemen Paket Langganan',
-                                                profile: 'Pengaturan Akun'
+                                                dashboard: 'Dashboard Overview & Analytics',
+                                                transactions: 'Transaction Ledger & Records',
+                                                reports: 'Financial Statements & Reports',
+                                                subscriptions: 'Subscription & User Management',
+                                                profile: 'Account Settings & Credentials'
                                             }[activeTab]}
                                         </h2>
                                         <p className="text-gray-500 text-sm mt-1">
                                             {{
-                                                dashboard: 'Ringkasan aktivitas keuangan Anda hari ini.',
-                                                transactions: 'Kelola pemasukan dan pengeluaran dengan mudah.',
-                                                reports: 'Analisis dan unduh laporan keuangan.',
-                                                subscriptions: 'Kelola paket Premium pengguna, statistik, dan pemberian akses admin.',
-                                                profile: 'Perbarui informasi dan keamanan akun Anda.'
+                                                dashboard: 'Ringkasan arus kas dan performa keuangan real-time.',
+                                                transactions: 'Catat dan kelola riwayat transaksi pemasukan serta pengeluaran.',
+                                                reports: 'Analisis mendalam dan cetak lembar kerja keuangan standar.',
+                                                subscriptions: 'Kelola status langganan pengguna, kuota, dan hak akses admin.',
+                                                profile: 'Perbarui informasi identitas profil dan keamanan kata sandi akun.'
                                             }[activeTab]}
                                         </p>
                                     </div>
@@ -1515,6 +2001,7 @@ const AdminDashboard = () => {
                                                 )}
 
                                                 <FilterButtons />
+
                                                 {/* Stats Cards */}
                                                 <motion.div 
                                                     variants={containerVariants}
@@ -1523,39 +2010,60 @@ const AdminDashboard = () => {
                                                     className="grid grid-cols-1 md:grid-cols-3 gap-6"
                                                 >
                                                      {/* Income */}
-                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
                                                          <div className="flex items-start justify-between">
                                                              <div>
-                                                                 <p className="text-sm font-medium text-gray-500 mb-1">Total Pemasukan</p>
-                                                                 <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(totalIncome)}</h3>
+                                                                 <div className="flex items-center gap-1.5 mb-1">
+                                                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Revenue</p>
+                                                                     <span className="text-[10px] text-gray-400">• Pemasukan</span>
+                                                                 </div>
+                                                                 <h3 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight">{displayCurrency(totalIncome)}</h3>
+                                                                 <p className="text-[11px] text-emerald-600 font-medium mt-2 flex items-center gap-1">
+                                                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                                     Total dana masuk periode ini
+                                                                 </p>
                                                              </div>
-                                                             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                                                             <div className="p-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl group-hover:scale-110 transition-transform">
                                                                  <TrendingUp className="w-5 h-5 text-emerald-600" />
                                                              </div>
                                                          </div>
                                                      </motion.div>
 
                                                      {/* Expense */}
-                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
                                                          <div className="flex items-start justify-between">
                                                              <div>
-                                                                 <p className="text-sm font-medium text-gray-500 mb-1">Total Pengeluaran</p>
-                                                                 <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(totalExpense)}</h3>
+                                                                 <div className="flex items-center gap-1.5 mb-1">
+                                                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Expenses</p>
+                                                                     <span className="text-[10px] text-gray-400">• Pengeluaran</span>
+                                                                 </div>
+                                                                 <h3 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight">{displayCurrency(totalExpense)}</h3>
+                                                                 <p className="text-[11px] text-rose-600 font-medium mt-2 flex items-center gap-1">
+                                                                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                                     Total beban pengeluaran tercatat
+                                                                 </p>
                                                              </div>
-                                                             <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+                                                             <div className="p-3 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl group-hover:scale-110 transition-transform">
                                                                  <TrendingDown className="w-5 h-5 text-rose-600" />
                                                              </div>
                                                          </div>
                                                      </motion.div>
 
                                                      {/* Balance */}
-                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm relative overflow-hidden">
+                                                     <motion.div variants={cardVariants} className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all relative overflow-hidden group">
                                                          <div className="flex items-start justify-between">
                                                              <div>
-                                                                 <p className="text-sm font-medium text-gray-500 mb-1">Saldo Bersih</p>
-                                                                 <h3 className="text-2xl font-bold text-gray-900">{formatCurrency(balance)}</h3>
+                                                                 <div className="flex items-center gap-1.5 mb-1">
+                                                                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Net Cashflow</p>
+                                                                     <span className="text-[10px] text-gray-400">• Saldo Bersih</span>
+                                                                 </div>
+                                                                 <h3 className={`text-2xl lg:text-3xl font-extrabold tracking-tight ${balance >= 0 ? 'text-gray-900' : 'text-rose-600'}`}>{displayCurrency(balance)}</h3>
+                                                                 <p className="text-[11px] text-blue-600 font-medium mt-2 flex items-center gap-1">
+                                                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                                                     Cadangan kas likuid aktif
+                                                                 </p>
                                                              </div>
-                                                             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                                             <div className="p-3 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl group-hover:scale-110 transition-transform">
                                                                  <Wallet className="w-5 h-5 text-blue-600" />
                                                              </div>
                                                          </div>
@@ -1570,19 +2078,28 @@ const AdminDashboard = () => {
                                                     className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                                                 >
                                                      {/* Line Chart */}
-                                                     <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                                                     <div className="lg:col-span-2 bg-white border border-gray-200/90 rounded-2xl p-6 shadow-xs">
                                                          <div className="flex items-center justify-between mb-6">
-                                                             <h3 className="text-lg font-bold text-gray-900">Analisis Arus Kas</h3>
+                                                             <div>
+                                                                 <h3 className="text-base font-extrabold text-gray-900">Cashflow Analytics / Arus Kas</h3>
+                                                                 <p className="text-xs text-gray-500">Tren pemasukan dan pengeluaran per periode</p>
+                                                             </div>
+                                                             <span className="text-[10px] font-bold px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg">
+                                                                 Currency: {currency}
+                                                             </span>
                                                          </div>
                                                          <div className="h-72">
                                                              <Line options={chartOptions} data={chartData} />
                                                          </div>
                                                      </div>
- 
+  
                                                      {/* Doughnut Chart */}
-                                                     <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+                                                     <div className="bg-white border border-gray-200/90 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
                                                          <div className="flex items-center justify-between mb-4">
-                                                             <h3 className="text-lg font-bold text-gray-900">Distribusi Pengeluaran</h3>
+                                                             <div>
+                                                                 <h3 className="text-base font-extrabold text-gray-900">Expense Breakdown / Pengeluaran</h3>
+                                                                 <p className="text-xs text-gray-500">Distribusi alokasi per kategori</p>
+                                                             </div>
                                                          </div>
                                                          <div className="h-44 flex items-center justify-center">
                                                              <Doughnut options={categoryChartOptions} data={categoryChartData} />
@@ -1601,7 +2118,7 @@ const AdminDashboard = () => {
                                                                                  <span className="capitalize truncate max-w-[120px] font-medium">{item.category}</span>
                                                                              </div>
                                                                              <div className="flex items-center gap-3">
-                                                                                 <span className="text-gray-400 font-medium">{formatCurrency(item.amount)}</span>
+                                                                                 <span className="text-gray-400 font-medium font-mono">{displayCurrency(item.amount)}</span>
                                                                                  <span className="font-bold text-gray-900 w-8 text-right">{percentage}%</span>
                                                                              </div>
                                                                          </div>
@@ -1821,7 +2338,7 @@ const AdminDashboard = () => {
                                                     ) : (
                                                         <>
                                                             <Camera className="w-4 h-4 text-blue-600" />
-                                                            <span>Catat via Foto Struk / Nota</span>
+                                                            <span>Catat via Foto Struk / AI Scan Receipt</span>
                                                         </>
                                                     )}
                                                 </button>
@@ -1833,19 +2350,19 @@ const AdminDashboard = () => {
                                                             onClick={() => setFormData({ ...formData, type: 'pemasukan' })}
                                                             className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pemasukan' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
-                                                            Pemasukan
+                                                            Pemasukan (Income)
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setFormData({ ...formData, type: 'pengeluaran' })}
                                                             className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pengeluaran' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
-                                                            Pengeluaran
+                                                            Pengeluaran (Expense)
                                                         </button>
                                                     </div>
 
                                                     <div>
-                                                        <label htmlFor="trans-date" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Tanggal</label>
+                                                        <label htmlFor="trans-date" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Tanggal / Date</label>
                                                         <div className="relative">
                                                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                                                             <input
@@ -1860,9 +2377,9 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label htmlFor="trans-amount" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Jumlah</label>
+                                                        <label htmlFor="trans-amount" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Nominal / Amount ({currency})</label>
                                                         <div className="relative">
-                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm font-bold">Rp</span>
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm font-bold font-mono">{currency === 'USD' ? '$' : 'Rp'}</span>
                                                             <input
                                                                 id="trans-amount"
                                                                 type="text"
@@ -1873,10 +2390,19 @@ const AdminDashboard = () => {
                                                                 required
                                                             />
                                                         </div>
+                                                        {formData.amount && (
+                                                            <p className="text-[10px] text-gray-500 mt-1 pl-1">
+                                                                {currency === 'USD' ? (
+                                                                    <span>≈ Rp {((Number(formData.amount.replace(/\D/g, '') || 0)) * exchangeRate).toLocaleString('id-ID')} (Kurs: 1 USD = Rp {exchangeRate.toLocaleString('id-ID')})</span>
+                                                                ) : (
+                                                                    <span>≈ ${(((Number(formData.amount.replace(/\D/g, '') || 0)) / exchangeRate)).toFixed(2)} USD (Kurs: 1 USD = Rp {exchangeRate.toLocaleString('id-ID')})</span>
+                                                                )}
+                                                            </p>
+                                                        )}
                                                     </div>
 
                                                     <div>
-                                                         <label htmlFor="trans-category-select" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Kategori</label>
+                                                         <label htmlFor="trans-category-select" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Kategori / Category</label>
                                                          <select
                                                              id="trans-category-select"
                                                              aria-label="Pilih Kategori Transaksi"
@@ -1971,12 +2497,12 @@ const AdminDashboard = () => {
                                                 </div>
                                                 <div className="hidden md:block overflow-x-auto flex-1 lg:h-[calc(100vh-310px)] lg:overflow-y-auto">
                                                     <table className="w-full text-left text-sm text-gray-500">
-                                                        <thead className="bg-gray-50 text-gray-600 font-semibold border-b border-gray-200 sticky top-0 z-10">
+                                                        <thead className="bg-gray-50/90 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200 sticky top-0 z-10">
                                                             <tr>
-                                                                <th className="px-6 py-4 w-1/4">Tanggal</th>
-                                                                <th className="px-6 py-4 w-1/4">Kategori</th>
-                                                                <th className="px-6 py-4 w-1/4">Nominal</th>
-                                                                <th className="px-6 py-4 w-1/4 text-right">Aksi</th>
+                                                                <th className="px-6 py-3.5 w-1/4">Tanggal / Date</th>
+                                                                <th className="px-6 py-3.5 w-1/4">Kategori / Category</th>
+                                                                <th className="px-6 py-3.5 w-1/4">Nominal / Amount ({currency})</th>
+                                                                <th className="px-6 py-3.5 w-1/4 text-right">Aksi / Actions</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-100 bg-white">
@@ -1997,8 +2523,10 @@ const AdminDashboard = () => {
                                                                             className="hover:bg-gray-50/50 transition"
                                                                         >
                                                                             <td className="px-6 py-4">
-                                                                                <div className="text-gray-800 font-medium">{formatDate(t.date)}</div>
-                                                                                <div className="text-xs text-gray-400">{t.date ? new Date(t.date).getFullYear() : ''}</div>
+                                                                                <div className="text-gray-800 font-medium">{displayDate(t.date)}</div>
+                                                                                <div className="text-xs text-gray-400 capitalize">
+                                                                                    {parseSafeDate(t.date)?.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', { weekday: 'long' }) || ''}
+                                                                                </div>
                                                                             </td>
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
@@ -2008,8 +2536,8 @@ const AdminDashboard = () => {
                                                                                 {t.description && t.description !== '-' && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{t.description}</div>}
                                                                             </td>
                                                                             <td className="px-6 py-4">
-                                                                                <span className={`font-semibold ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                                                <span className={`font-semibold font-mono ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
                                                                                 </span>
                                                                             </td>
                                                                             <td className="px-6 py-4 text-right">
@@ -2048,14 +2576,16 @@ const AdminDashboard = () => {
                                                                 >
                                                                     <div className="flex justify-between items-start border-b border-gray-100 pb-2">
                                                                         <div>
-                                                                            <p className="text-xs text-gray-400">{formatDate(t.date)} {t.date ? new Date(t.date).getFullYear() : ''}</p>
+                                                                            <p className="text-xs text-gray-500 font-medium">
+                                                                                {displayDate(t.date)} • {parseSafeDate(t.date)?.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', { weekday: 'short' }) || ''}
+                                                                            </p>
                                                                             <div className="flex items-center gap-2 mt-1">
                                                                                 <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
                                                                                 <span className="text-gray-800 font-bold">{capitalizeText(t.category)}</span>
                                                                             </div>
                                                                         </div>
-                                                                        <span className={`font-bold ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                            {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                                        <span className={`font-bold font-mono ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                            {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
                                                                         </span>
                                                                     </div>
                                                                     {t.description && t.description !== '-' && <p className="text-xs text-gray-500 italic">{t.description}</p>}
@@ -2101,33 +2631,33 @@ const AdminDashboard = () => {
                                             const totalExpenseCat = expenseRows.reduce((s, [, v]) => s + v, 0);
                                             const saldo = totalIncomeCat - totalExpenseCat;
 
-                                            const periodLabel = activePeriod === 'week' ? 'Minggu Ini'
-                                                : activePeriod === 'month' ? new Date().toLocaleString('id-ID', { month: 'long', year: 'numeric' })
-                                                : activePeriod === 'year' ? `Tahun ${new Date().getFullYear()}`
-                                                : 'Semua Periode';
+                                            const periodLabel = activePeriod === 'week' ? (currency === 'USD' ? 'This Week (Minggu Ini)' : 'Minggu Ini')
+                                                : activePeriod === 'month' ? new Date().toLocaleString(currency === 'USD' ? 'en-US' : 'id-ID', { month: 'long', year: 'numeric' })
+                                                : activePeriod === 'year' ? (currency === 'USD' ? `Year ${new Date().getFullYear()}` : `Tahun ${new Date().getFullYear()}`)
+                                                : (currency === 'USD' ? 'All Periods (Semua Periode)' : 'Semua Periode');
 
                                             return (
                                                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                                                     {/* Header */}
                                                     <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                                         <div>
-                                                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Laporan Keuangan</p>
-                                                            <h2 className="text-white text-xl font-extrabold tracking-tight">Anggaran Bulanan</h2>
-                                                            <p className="text-slate-300 text-xs mt-1">Periode: <span className="font-bold text-white">{periodLabel}</span></p>
+                                                            <p className="text-slate-400 text-xs font-semibold uppercase tracking-widest mb-1">Financial Statement / Laporan</p>
+                                                            <h2 className="text-white text-xl font-extrabold tracking-tight">Anggaran Bulanan (Monthly Cashflow)</h2>
+                                                            <p className="text-slate-300 text-xs mt-1">Periode: <span className="font-bold text-white">{periodLabel}</span> • Mata Uang: <span className="font-bold text-blue-300">{currency}</span></p>
                                                         </div>
                                                         {/* Saldo Box - top right */}
                                                         <div className="flex gap-3 flex-wrap">
                                                             <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-3 text-center min-w-[120px]">
-                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Pemasukan</p>
-                                                                <p className="text-emerald-400 font-extrabold text-sm mt-0.5">{formatCurrency(totalIncomeCat)}</p>
+                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Revenue / Masuk</p>
+                                                                <p className="text-emerald-400 font-extrabold text-sm mt-0.5 font-mono">{displayCurrency(totalIncomeCat)}</p>
                                                             </div>
                                                             <div className="bg-slate-700/60 border border-slate-600 rounded-xl px-4 py-3 text-center min-w-[120px]">
-                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Pengeluaran</p>
-                                                                <p className="text-rose-400 font-extrabold text-sm mt-0.5">{formatCurrency(totalExpenseCat)}</p>
+                                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Expenses / Keluar</p>
+                                                                <p className="text-rose-400 font-extrabold text-sm mt-0.5 font-mono">{displayCurrency(totalExpenseCat)}</p>
                                                             </div>
                                                             <div className={`border rounded-xl px-4 py-3 text-center min-w-[120px] ${saldo >= 0 ? 'bg-emerald-600/20 border-emerald-500/40' : 'bg-rose-600/20 border-rose-500/40'}`}>
-                                                                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-wider">Saldo Bersih</p>
-                                                                <p className={`font-extrabold text-sm mt-0.5 ${saldo >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(saldo)}</p>
+                                                                <p className="text-slate-300 text-[10px] font-bold uppercase tracking-wider">Net Cash / Bersih</p>
+                                                                <p className={`font-extrabold text-sm mt-0.5 font-mono ${saldo >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{displayCurrency(saldo)}</p>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2137,16 +2667,16 @@ const AdminDashboard = () => {
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-3">
                                                                 <div className="w-3 h-3 rounded-sm bg-emerald-500"></div>
-                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pendapatan</h3>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pendapatan (Income)</h3>
                                                             </div>
                                                             <div className="rounded-xl overflow-hidden border border-gray-200">
                                                                 <table className="w-full text-sm text-left">
                                                                     <thead>
                                                                         <tr className="bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider">
                                                                             <th className="px-4 py-3 w-8">#</th>
-                                                                            <th className="px-4 py-3">Kategori / Sumber</th>
-                                                                            <th className="px-4 py-3 text-right">Aktual</th>
-                                                                            <th className="px-4 py-3 text-right w-32">% dari Total</th>
+                                                                            <th className="px-4 py-3">Kategori (Category)</th>
+                                                                            <th className="px-4 py-3 text-right">Nominal (Amount)</th>
+                                                                            <th className="px-4 py-3 text-right w-32">% Share</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody className="divide-y divide-gray-100">
@@ -2158,7 +2688,7 @@ const AdminDashboard = () => {
                                                                             <tr key={cat} className={idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/40'}>
                                                                                 <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
                                                                                 <td className="px-4 py-3 font-semibold text-gray-800">{cat}</td>
-                                                                                <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{formatCurrency(amt)}</td>
+                                                                                <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{displayCurrency(amt)}</td>
                                                                                 <td className="px-4 py-3 text-right">
                                                                                     <div className="flex items-center justify-end gap-2">
                                                                                         <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
@@ -2174,8 +2704,8 @@ const AdminDashboard = () => {
                                                                     </tbody>
                                                                     <tfoot>
                                                                         <tr className="bg-emerald-100 border-t-2 border-emerald-300">
-                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-emerald-800 text-xs uppercase tracking-wider">Total Pendapatan</td>
-                                                                            <td className="px-4 py-3 text-right font-extrabold text-emerald-800 tabular-nums">{formatCurrency(totalIncomeCat)}</td>
+                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-emerald-800 text-xs uppercase tracking-wider">Total Pendapatan (Total Revenue)</td>
+                                                                            <td className="px-4 py-3 text-right font-extrabold text-emerald-800 tabular-nums">{displayCurrency(totalIncomeCat)}</td>
                                                                             <td className="px-4 py-3 text-right font-bold text-emerald-700 text-xs">100%</td>
                                                                         </tr>
                                                                     </tfoot>
@@ -2187,14 +2717,14 @@ const AdminDashboard = () => {
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-3">
                                                                 <div className="w-3 h-3 rounded-sm bg-rose-500"></div>
-                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pengeluaran</h3>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Pengeluaran (Expenses)</h3>
                                                             </div>
                                                             <div className="rounded-xl overflow-hidden border border-gray-200">
                                                                 <table className="w-full text-sm text-left">
                                                                     <thead>
                                                                         <tr className="bg-rose-600 text-white text-xs font-bold uppercase tracking-wider">
                                                                             <th className="px-4 py-3 w-8">#</th>
-                                                                            <th className="px-4 py-3">Kategori / Pos</th>
+                                                                            <th className="px-4 py-3">Kategori (Category)</th>
                                                                             <th className="px-4 py-3 text-right">Aktual</th>
                                                                             <th className="px-4 py-3 text-right w-32">% dari Total</th>
                                                                         </tr>
@@ -2208,7 +2738,7 @@ const AdminDashboard = () => {
                                                                             <tr key={cat} className={idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/40'}>
                                                                                 <td className="px-4 py-3 text-gray-400 text-xs font-mono">{idx + 1}</td>
                                                                                 <td className="px-4 py-3 font-semibold text-gray-800">{cat}</td>
-                                                                                <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{formatCurrency(amt)}</td>
+                                                                                <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{displayCurrency(amt)}</td>
                                                                                 <td className="px-4 py-3 text-right">
                                                                                     <div className="flex items-center justify-end gap-2">
                                                                                         <div className="w-16 bg-gray-100 rounded-full h-1.5 overflow-hidden">
@@ -2224,8 +2754,8 @@ const AdminDashboard = () => {
                                                                     </tbody>
                                                                     <tfoot>
                                                                         <tr className="bg-rose-100 border-t-2 border-rose-300">
-                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-rose-800 text-xs uppercase tracking-wider">Total Pengeluaran</td>
-                                                                            <td className="px-4 py-3 text-right font-extrabold text-rose-800 tabular-nums">{formatCurrency(totalExpenseCat)}</td>
+                                                                            <td colSpan="2" className="px-4 py-3 font-extrabold text-rose-800 text-xs uppercase tracking-wider">Total Pengeluaran (Total Expenses)</td>
+                                                                            <td className="px-4 py-3 text-right font-extrabold text-rose-800 tabular-nums">{displayCurrency(totalExpenseCat)}</td>
                                                                             <td className="px-4 py-3 text-right font-bold text-rose-700 text-xs">100%</td>
                                                                         </tr>
                                                                     </tfoot>
@@ -2236,7 +2766,7 @@ const AdminDashboard = () => {
                                                         {/* RINGKASAN SALDO */}
                                                         <div className="rounded-xl border border-gray-200 overflow-hidden">
                                                             <div className="bg-slate-700 px-4 py-3">
-                                                                <h3 className="text-white font-bold text-xs uppercase tracking-widest">Ringkasan Saldo</h3>
+                                                                <h3 className="text-white font-bold text-xs uppercase tracking-widest">Ringkasan Saldo (Cashflow Summary)</h3>
                                                             </div>
                                                             <table className="w-full text-sm text-left">
                                                                 <thead>
@@ -2249,20 +2779,20 @@ const AdminDashboard = () => {
                                                                 <tbody className="divide-y divide-gray-100">
                                                                     <tr className="bg-emerald-50/60">
                                                                         <td className="px-4 py-3 font-semibold text-gray-700">Total Pendapatan</td>
-                                                                        <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{formatCurrency(totalIncomeCat)}</td>
-                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">Masuk</span></td>
+                                                                        <td className="px-4 py-3 text-right font-bold text-emerald-700 tabular-nums">{displayCurrency(totalIncomeCat)}</td>
+                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-bold">+ Inflow</span></td>
                                                                     </tr>
                                                                     <tr className="bg-rose-50/60">
                                                                         <td className="px-4 py-3 font-semibold text-gray-700">Total Pengeluaran</td>
-                                                                        <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{formatCurrency(totalExpenseCat)}</td>
-                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full font-bold">Keluar</span></td>
+                                                                        <td className="px-4 py-3 text-right font-bold text-rose-700 tabular-nums">{displayCurrency(totalExpenseCat)}</td>
+                                                                        <td className="px-4 py-3 text-right"><span className="text-xs px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full font-bold">- Outflow</span></td>
                                                                     </tr>
                                                                     <tr className={saldo >= 0 ? 'bg-blue-50' : 'bg-amber-50'}>
                                                                         <td className="px-4 py-3 font-extrabold text-gray-900">SALDO BERSIH</td>
-                                                                        <td className={`px-4 py-3 text-right font-extrabold tabular-nums text-base ${saldo >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{formatCurrency(saldo)}</td>
+                                                                        <td className={`px-4 py-3 text-right font-extrabold tabular-nums text-base ${saldo >= 0 ? 'text-blue-700' : 'text-amber-700'}`}>{displayCurrency(saldo)}</td>
                                                                         <td className="px-4 py-3 text-right">
                                                                             <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${saldo >= 0 ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                                                {saldo >= 0 ? '✓ Surplus' : '⚠ Defisit'}
+                                                                                {saldo >= 0 ? '✓ Surplus' : '⚠ Deficit'}
                                                                             </span>
                                                                         </td>
                                                                     </tr>
@@ -2274,7 +2804,7 @@ const AdminDashboard = () => {
                                                         <div>
                                                             <div className="flex items-center gap-2 mb-3 mt-4">
                                                                 <div className="w-3 h-3 rounded-sm bg-slate-500"></div>
-                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Histori Transaksi</h3>
+                                                                <h3 className="font-extrabold text-gray-900 text-sm uppercase tracking-widest">Histori Transaksi (Transaction History)</h3>
                                                             </div>
                                                             <div className="rounded-xl overflow-hidden border border-gray-200">
                                                                 <table className="w-full text-sm text-left">
@@ -2292,16 +2822,16 @@ const AdminDashboard = () => {
                                                                             <tr><td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-xs italic">Tidak ada data untuk periode ini.</td></tr>
                                                                         ) : filteredTransactions.slice(0, 15).map((t, idx) => (
                                                                             <tr key={t.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-slate-50/50 hover:bg-slate-100/50'}>
-                                                                                <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{formatDate(t.date)}</td>
+                                                                                <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{displayDate(t.date)}</td>
                                                                                 <td className="px-4 py-3">
                                                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${t.type === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                                                                        {t.type === 'pemasukan' ? 'Masuk' : 'Keluar'}
+                                                                                        {t.type === 'pemasukan' ? (currency === 'USD' ? 'Income' : 'Masuk') : (currency === 'USD' ? 'Expense' : 'Keluar')}
                                                                                     </span>
                                                                                 </td>
                                                                                 <td className="px-4 py-3 font-semibold text-gray-800">{capitalizeText(t.category)}</td>
                                                                                 <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{(t.description && t.description !== '-') ? t.description : '—'}</td>
                                                                                 <td className={`px-4 py-3 text-right font-bold tabular-nums ${t.type === 'pemasukan' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {formatCurrency(t.amount)}
+                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
                                                                                 </td>
                                                                             </tr>
                                                                         ))}
