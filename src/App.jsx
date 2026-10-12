@@ -19,7 +19,7 @@ const lazyWithRetry = (componentImport) =>
           try {
             const keys = await caches.keys();
             await Promise.all(keys.map(key => caches.delete(key)));
-          } catch {}
+          } catch (e) { /* ignore cache delete */ }
         }
         window.location.href = window.location.pathname + '?v=' + Date.now();
         return new Promise(() => {}); // Pause until reload

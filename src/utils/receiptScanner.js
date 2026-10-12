@@ -31,7 +31,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         let amount = 0;
         
         // Priority 1: Net Total lines like "Total Belanja", "Grand Total", "Total Netto", "Total Tagihan", "Total Bayar"
-        const netTotalRegex = /(total\s*belanja|total\s*netto|grand\s*total|total\s*tagihan|total\s*bayar)\s*:?\s*r?p?\.?\s*([\d\.,\s]+)/i;
+        const netTotalRegex = /(total\s*belanja|total\s*netto|grand\s*total|total\s*tagihan|total\s*bayar)\s*:?\s*r?p?\.?\s*([\d.,\s]+)/i;
         for (const line of lines) {
             const match = line.match(netTotalRegex);
             if (match && match[2]) {
@@ -46,7 +46,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
 
         // Priority 2: General total lines (excluding Tunai / Kembalian)
         if (amount === 0) {
-            const totalLineRegex = /(total|subtotal|jumlah|bayar|netto|tagihan|harga\s*total)\s*:?\s*r?p?\.?\s*([\d\.,\s]+)/i;
+            const totalLineRegex = /(total|subtotal|jumlah|bayar|netto|tagihan|harga\s*total)\s*:?\s*r?p?\.?\s*([\d.,\s]+)/i;
             for (const line of lines) {
                 if (/tunai|kembali|kembalian|cash/i.test(line)) continue; // skip cash tendered / change lines
                 const match = line.match(totalLineRegex);
@@ -78,7 +78,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
 
         // 2. Detect Date (Tanggal) - Format Tgl. DD-MM-YYYY
         let dateStr = new Date().toISOString().split('T')[0];
-        const dateRegex = /\b(?:tgl|tanggal|date)[\.\s:]*\s*(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})\b|\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})\b|\b(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})\b/i;
+        const dateRegex = /\b(?:tgl|tanggal|date)[.\s:]*\s*(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})\b|\b(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})\b|\b(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})\b/i;
         
         for (const line of lines) {
             const dateMatch = line.match(dateRegex);
@@ -107,7 +107,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         // 5. Detect Items Purchased & Merchant Store Name -> Combine into Description
         let description = '-';
         const isIgnoredLine = (l) => 
-            /\b\d{1,2}[\.:]\d{2}\b/.test(l) ||                      // Time format like 12.45 or 12:45
+            /\b\d{1,2}[.:]\d{2}\b/.test(l) ||                      // Time format like 12.45 or 12:45
             /%/.test(l) ||                                          // Battery percentage like 49%
             /\b(4g|5g|lte|volte|ge|wifi|3g)\b/i.test(l) ||           // Phone network indicators
             /^\d+$/.test(l) ||                                      // Pure numbers
@@ -124,7 +124,7 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
         let storeName = '';
         const headerCandidate = lines.find(l => l.length >= 3 && !isIgnoredLine(l) && !isGibberish(l));
         if (headerCandidate) {
-            const cleanedHeader = headerCandidate.replace(/[^a-zA-Z0-9\s\-\.\/]/g, '').replace(/\s+/g, ' ').trim();
+            const cleanedHeader = headerCandidate.replace(/[^a-zA-Z0-9\s\-./]/g, '').replace(/\s+/g, ' ').trim();
             if (cleanedHeader && cleanedHeader.length >= 3 && !isIgnoredLine(cleanedHeader)) {
                 storeName = cleanedHeader;
             }
@@ -142,9 +142,9 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             ) {
                 // Clean quantity & price tail from item line (e.g. "POPMIE G INDBBQ 1 6,100" -> "POPMIE G INDBBQ")
                 let cleanItem = line
-                    .replace(/[^a-zA-Z0-9\s\-\.\/]/g, '')
-                    .replace(/\s+\d+\s+[\d\.,\s]+$/, '')
-                    .replace(/\s+[\d\.,]+$/, '')
+                    .replace(/[^a-zA-Z0-9\s\-./]/g, '')
+                    .replace(/\s+\d+\s+[\d.,\s]+$/, '')
+                    .replace(/\s+[\d.,]+$/, '')
                     .replace(/\s+/g, ' ')
                     .trim();
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { formatCurrency } from '../utils/format';
 import { 
@@ -18,6 +18,7 @@ const BarcodePayment = ({
     const [copiedField, setCopiedField] = useState('');
     const [showZoomModal, setShowZoomModal] = useState(false);
     const [activeMethod, setActiveMethod] = useState(selectedMethod || 'QRIS');
+    const [prevSelectedMethod, setPrevSelectedMethod] = useState(selectedMethod);
 
     // Merchant information
     const MERCHANT_NAME = 'MUHAMMAD ARBAIN';
@@ -28,11 +29,10 @@ const BarcodePayment = ({
     const EWALLET_NAME = 'Muhammad Arbain';
     const WA_ADMIN = '6282215322757';
 
-    useEffect(() => {
-        if (selectedMethod && selectedMethod !== activeMethod) {
-            setActiveMethod(selectedMethod);
-        }
-    }, [selectedMethod]);
+    if (selectedMethod !== prevSelectedMethod) {
+        setPrevSelectedMethod(selectedMethod);
+        setActiveMethod(selectedMethod);
+    }
 
     const handleMethodSwitch = (method) => {
         setActiveMethod(method);

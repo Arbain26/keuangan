@@ -37,7 +37,7 @@ const PricingPage = () => {
     const [user, setUser] = useState(null);
     const [userSub, setUserSub] = useState(null);
     const [plans, setPlans] = useState(DEFAULT_PLANS);
-    const [loading, setLoading] = useState(true);
+    const [_loading, setLoading] = useState(true);
 
     // Modal Checkout State
     const [selectedPlan, setSelectedPlan] = useState(null);
@@ -92,7 +92,7 @@ const PricingPage = () => {
                     setPendingOrder(prev => ({ ...prev, status: status.status }));
                     clearInterval(poll);
                 }
-            } catch {}
+            } catch (e) { /* ignore polling error */ }
         }, 5000);
         return () => clearInterval(poll);
     }, [pendingOrder, paymentConfirmed, user]);

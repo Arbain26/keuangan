@@ -7,7 +7,6 @@ import { scanReceiptImage } from '../utils/receiptScanner';
 import { 
     getUserSubscriptionStatus, 
     checkFeatureAccess, 
-    adminGrantPremium,
     adminConfirmPayment,
     adminCancelPayment,
     adminRevokePremium,
@@ -238,7 +237,7 @@ const AdminDashboard = () => {
         setCurrency(newCurr);
         try {
             localStorage.setItem('fintrack_currency', newCurr);
-        } catch {}
+        } catch (e) { /* ignore storage error */ }
 
         // Seamlessly convert currently typed amount in form if present
         setFormData(prev => {
@@ -325,18 +324,9 @@ const AdminDashboard = () => {
     // Subscription & Limit State
     const [userSub, setUserSub] = useState(null);
     const [usageLimits, setUsageLimits] = useState(DEFAULT_LIMITS);
-    const [plans, setPlans] = useState(DEFAULT_PLANS);
+    const [_plans, setPlans] = useState(DEFAULT_PLANS);
     const [allSubscriptions, setAllSubscriptions] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
-    const [userSearchTerm, setUserSearchTerm] = useState('');
-    const [userStatusFilter, setUserStatusFilter] = useState('ALL'); // ALL | ACTIVE | FREE | EXPIRED
-    const [isGrantModalOpen, setIsGrantModalOpen] = useState(false);
-    const [grantForm, setGrantForm] = useState({
-        targetUserId: '',
-        targetUserEmail: '',
-        planCode: 'PREMIUM_MONTHLY',
-        note: ''
-    });
     const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
     const [editUserForm, setEditUserForm] = useState({
         userId: '',
@@ -348,7 +338,6 @@ const AdminDashboard = () => {
     });
     const [dashboardUserSearch, setDashboardUserSearch] = useState('');
     const [limitModal, setLimitModal] = useState(null);
-    const [orderFilter, setOrderFilter] = useState('ALL'); // ALL | PENDING | PAID | CANCELLED | EXPIRED
     const [isConfirmingOrder, setIsConfirmingOrder] = useState(null); // orderId being confirmed
 
     // Admin Utama status check
@@ -1225,7 +1214,7 @@ const AdminDashboard = () => {
             };
             let headerFound = false;
 
-            worksheet.eachRow((row, rowNumber) => {
+            worksheet.eachRow((row) => {
                 if (!headerFound) {
                     let hasHeaderMarker = false;
                     row.eachCell((cell, colNumber) => {
@@ -1875,7 +1864,7 @@ const AdminDashboard = () => {
                                     </div>
                                     {activeTab === 'subscriptions' && isAdminUtama && (
                                         <button
-                                            onClick={() => setIsGrantModalOpen(true)}
+                                            onClick={() => handleOpenEditUserModal(null)}
                                             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-sm font-bold rounded-lg hover:from-amber-600 hover:to-amber-700 transition shadow-lg shadow-amber-500/20"
                                         >
                                             <Award className="w-4 h-4" />

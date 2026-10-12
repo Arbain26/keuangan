@@ -124,7 +124,7 @@ export const getUserSubscriptionStatus = async (userId, userEmail = null) => {
                             role: 'SUPER_ADMIN'
                         };
                     }
-                } catch {}
+                } catch (e) { /* ignore */ }
             }
 
             const { data, error } = await supabase
@@ -144,7 +144,7 @@ export const getUserSubscriptionStatus = async (userId, userEmail = null) => {
             if (localSub) {
                 try {
                     subData = JSON.parse(localSub);
-                } catch {}
+                } catch (e) { /* ignore */ }
             }
         }
 
@@ -428,7 +428,7 @@ export const createCheckoutOrder = async ({
         let { error } = await supabase.from('orders').insert([orderData]);
         if (error && error.message?.includes('user_email')) {
             // Fallback if user_email column is not yet in DB schema
-            const { user_email, ...fallbackOrder } = orderData;
+            const { user_email: _user_email, ...fallbackOrder } = orderData;
             await supabase.from('orders').insert([fallbackOrder]);
         }
     }
@@ -439,7 +439,7 @@ export const createCheckoutOrder = async ({
         const localOrders = JSON.parse(localOrdersStr);
         localOrders.unshift(orderData);
         localStorage.setItem('local_user_orders', JSON.stringify(localOrders.slice(0, 50)));
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return orderData;
 };
@@ -457,7 +457,7 @@ export const checkPaymentStatus = async (orderId) => {
                 .maybeSingle();
 
             if (!error && data) return data;
-        } catch {}
+        } catch (e) { /* ignore */ }
     }
 
     // Fallback: check localStorage
@@ -524,7 +524,7 @@ export const adminConfirmPayment = async (orderId) => {
             .update(subPayload)
             .eq('id', existingSub.id);
         if (updateRes.error && updateRes.error.message?.includes('user_email')) {
-            const { user_email, ...fallbackSub } = subPayload;
+            const { user_email: _user_email, ...fallbackSub } = subPayload;
             await supabase.from('user_subscriptions').update(fallbackSub).eq('id', existingSub.id);
         }
     } else {
@@ -532,7 +532,7 @@ export const adminConfirmPayment = async (orderId) => {
             .from('user_subscriptions')
             .insert([subPayload]);
         if (insertRes.error && insertRes.error.message?.includes('user_email')) {
-            const { user_email, ...fallbackSub } = subPayload;
+            const { user_email: _user_email, ...fallbackSub } = subPayload;
             await supabase.from('user_subscriptions').insert([fallbackSub]);
         }
     }
@@ -541,7 +541,7 @@ export const adminConfirmPayment = async (orderId) => {
     try {
         const localKey = `local_sub_${order.user_id}`;
         localStorage.setItem(localKey, JSON.stringify(subPayload));
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return { success: true, order: { ...order, status: 'PAID', paid_at: now }, subPayload };
 };
@@ -597,7 +597,7 @@ export const adminGrantPremium = async ({ adminUserId, targetUserId, targetUserE
                 .update(subPayload)
                 .eq('id', existingSub.id);
             if (res.error && res.error.message?.includes('user_email')) {
-                const { user_email, ...fallbackSub } = subPayload;
+                const { user_email: _user_email, ...fallbackSub } = subPayload;
                 await supabase.from('user_subscriptions').update(fallbackSub).eq('id', existingSub.id);
             }
         } else {
@@ -605,7 +605,7 @@ export const adminGrantPremium = async ({ adminUserId, targetUserId, targetUserE
                 .from('user_subscriptions')
                 .insert([subPayload]);
             if (res.error && res.error.message?.includes('user_email')) {
-                const { user_email, ...fallbackSub } = subPayload;
+                const { user_email: _user_email, ...fallbackSub } = subPayload;
                 await supabase.from('user_subscriptions').insert([fallbackSub]);
             }
         }
@@ -614,7 +614,7 @@ export const adminGrantPremium = async ({ adminUserId, targetUserId, targetUserE
     try {
         const localKey = `local_sub_${targetUserId}`;
         localStorage.setItem(localKey, JSON.stringify(subPayload));
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return subPayload;
 };
@@ -640,7 +640,7 @@ export const adminRevokePremium = async (targetUserId) => {
     try {
         const localKey = `local_sub_${targetUserId}`;
         localStorage.removeItem(localKey);
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return { success: true };
 };
@@ -669,7 +669,7 @@ export const adminEditUserSubscription = async ({ userId, userEmail, planCode, s
         .eq('user_id', userId);
 
     if (res.error && res.error.message?.includes('user_email')) {
-        const { user_email, ...fallbackPayload } = payload;
+        const { user_email: _user_email, ...fallbackPayload } = payload;
         await supabase
             .from('user_subscriptions')
             .update(fallbackPayload)
@@ -688,7 +688,7 @@ export const adminEditUserSubscription = async ({ userId, userEmail, planCode, s
     try {
         const localKey = `local_sub_${userId}`;
         localStorage.setItem(localKey, JSON.stringify({ ...payload, user_id: userId }));
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return { success: true };
 };
@@ -735,7 +735,7 @@ export const adminDeleteUserSubscription = async (userId, userEmail) => {
     try {
         const localKey = `local_sub_${userId}`;
         localStorage.removeItem(localKey);
-    } catch {}
+    } catch (e) { /* ignore */ }
 
     return { success: true };
 };
@@ -769,7 +769,7 @@ export const recordUserLoginOrRegister = async (user) => {
 
             let res = await supabase.from('user_subscriptions').insert([initialSub]);
             if (res.error && res.error.message?.includes('user_email')) {
-                const { user_email, ...fallbackSub } = initialSub;
+                const { user_email: _user_email, ...fallbackSub } = initialSub;
                 await supabase.from('user_subscriptions').insert([fallbackSub]);
             }
         } else {
