@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://fintrack.example.com/sitemap.xml
+Sitemap: https://keuangan.example.com/sitemap.xml

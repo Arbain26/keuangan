@@ -11,6 +11,9 @@ import {
 } from '../utils/subscriptionEngine';
 import { formatCurrency } from '../utils/format';
 import BarcodePayment from '../components/BarcodePayment';
+import { useLanguage } from '../hooks/useLanguage';
+import { usePageTitle } from '../hooks/usePageTitle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { 
     Check, X, Sparkles, Shield, Zap, Award, ArrowLeft, CreditCard, 
     QrCode, Building2, Wallet, CheckCircle2, Lock, Tag, AlertCircle, Copy, Phone
@@ -33,6 +36,9 @@ const TableCross = () => (
 );
 
 const PricingPage = () => {
+    const { t, lang } = useLanguage();
+    usePageTitle('premium.pricingTitle');
+
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [userSub, setUserSub] = useState(null);
@@ -229,23 +235,24 @@ const PricingPage = () => {
     return (
         <main className="min-h-screen bg-gray-50 text-gray-900 pb-20">
             {/* Header / Navbar */}
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-xs">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 font-medium text-sm transition">
                             <ArrowLeft className="w-4 h-4 mr-1.5" />
-                            Kembali ke Halaman Publik
+                            {t('auth.backToPublic')}
                         </Link>
                     </div>
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4">
+                        <LanguageSwitcher variant="header" />
                         {user ? (
                             <Link to="/admin" className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition">
-                                Dashboard Saya
+                                {t('nav.dashboard')}
                             </Link>
                         ) : (
-                            <Link to="/login" className="text-xs font-bold px-3.5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm">
-                                Masuk / Daftar
+                            <Link to="/login" className="text-xs font-bold px-3.5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-xs">
+                                {t('home.login')}
                             </Link>
                         )}
                     </div>

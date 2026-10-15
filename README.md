@@ -1,11 +1,11 @@
-# FinTrack - Personal Finance Management
+# Keuangan — Smart & Transparent Cash Flow Management
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![React](https://img.shields.io/badge/React-19.0-blue)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8)
 ![Supabase](https://img.shields.io/badge/Supabase-Backend-green)
 
-**FinTrack** adalah aplikasi manajemen keuangan pribadi yang dirancang untuk transparansi dan kemudahan pengelolaan arus kas. Aplikasi ini terdiri dari dashboard publik untuk melihat ringkasan keuangan dan dashboard admin yang aman untuk mengelola data transaksi.
+**Keuangan** adalah aplikasi manajemen arus kas cerdas dan transparan untuk pengelolaan keuangan pribadi maupun organisasi. Aplikasi ini terdiri dari dashboard publik untuk melihat ringkasan keuangan dan dashboard admin yang aman untuk mengelola data transaksi secara terstruktur.
 
 ## 🌟 Fitur Utama
 

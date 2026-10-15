@@ -4,6 +4,9 @@ import { fetchTransactions, createTransaction, deleteTransaction, updateTransact
 import { LogOut, Trash2, Edit2, Plus, X, Search, FileText, LayoutDashboard, User, Lock, Save, Zap, ChevronRight, Menu, Clock, Filter, Terminal, Activity, DollarSign, Wallet, Download, Upload, Table, TrendingUp, TrendingDown, Calendar, CreditCard, Camera, Shield, Award, Sparkles, CheckCircle2, AlertCircle, ShoppingBag, Crown, MessageCircle, Phone, RefreshCw, Users, ShieldCheck, Check, Ban, Globe } from 'lucide-react';
 import { formatCurrency, formatDate, normalizeCategory } from '../utils/format';
 import { scanReceiptImage } from '../utils/receiptScanner';
+import { useLanguage } from '../hooks/useLanguage';
+import { usePageTitle } from '../hooks/usePageTitle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { 
     getUserSubscriptionStatus, 
     checkFeatureAccess, 
@@ -204,20 +207,30 @@ const parseExcelDate = (val) => {
 };
 
 const CATEGORIES = [
-    { id: 'makanan & minuman', label: 'Makanan & Minuman (Food & Dining)', icon: '🍔' },
-    { id: 'transportasi', label: 'Transportasi (Transportation)', icon: '🚗' },
-    { id: 'pendidikan', label: 'Pendidikan / Kuliah (Education)', icon: '🎓' },
-    { id: 'belanja', label: 'Belanja (Shopping & Retail)', icon: '🛍️' },
-    { id: 'hiburan', label: 'Hiburan/Rekreasi (Entertainment)', icon: '🎬' },
-    { id: 'utilitas', label: 'Tagihan & Utilitas (Bills & Utilities)', icon: '⚡' },
-    { id: 'kesehatan', label: 'Kesehatan (Health & Medical)', icon: '🏥' },
-    { id: 'gaji', label: 'Gaji/Pendapatan (Salary & Income)', icon: '💵' },
-    { id: 'investasi', label: 'Investasi (Investments)', icon: '📈' },
-    { id: 'lainnya', label: 'Lainnya (Other / Custom)', icon: '📝' }
+    { id: 'makanan & minuman', label: 'Makanan & Minuman', icon: '🍔' },
+    { id: 'transportasi', label: 'Transportasi', icon: '🚗' },
+    { id: 'pendidikan', label: 'Pendidikan', icon: '🎓' },
+    { id: 'belanja', label: 'Belanja', icon: '🛍️' },
+    { id: 'hiburan', label: 'Hiburan', icon: '🎬' },
+    { id: 'utilitas', label: 'Tagihan & Utilitas', icon: '⚡' },
+    { id: 'kesehatan', label: 'Kesehatan', icon: '🏥' },
+    { id: 'gaji', label: 'Gaji / Pendapatan', icon: '💵' },
+    { id: 'investasi', label: 'Investasi', icon: '📈' },
+    { id: 'lainnya', label: 'Lainnya', icon: '📝' }
 ];
 
 const AdminDashboard = () => {
+    const { t, lang } = useLanguage();
     const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | transactions | reports | profile
+    usePageTitle(`nav.${activeTab}`);
+
+    const getCategoryLabel = (cat) => {
+        if (!cat) return t('categories.lainnya') || 'Lainnya';
+        const key = cat.trim().toLowerCase();
+        const translated = t(`categories.${key}`);
+        if (translated && !translated.startsWith('categories.')) return translated;
+        return capitalizeText(cat);
+    };
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -602,8 +615,8 @@ const AdminDashboard = () => {
             const access = await checkFeatureAccess(user, 'transaction', transactions.length);
             if (!access.allowed) {
                 setLimitModal({
-                    title: 'Batas Transaksi Bulanan Terlampaui',
-                    message: `Pengguna FREE memiliki batas ${access.limit} transaksi per bulan. Anda telah mencatatkan ${access.usage} transaksi bulan ini. Upgrade ke Paket Premium untuk transaksi tanpa batas!`
+                    title: lang === 'en' ? 'Monthly Transaction Limit Exceeded' : 'Batas Transaksi Bulanan Terlampaui',
+                    message: t('limits.transactionLimit', { limit: access.limit }) || `Pengguna FREE memiliki batas ${access.limit} transaksi per bulan. Upgrade ke Paket Premium untuk transaksi tanpa batas!`
                 });
                 return;
             }
@@ -729,6 +742,19 @@ const AdminDashboard = () => {
 
     const exportToExcel = async () => {
         try {
+            const currentMonthKey = new Date().toISOString().slice(0, 7);
+            const exportStorageKey = `keuangan_export_count_${user?.id || 'anon'}_${currentMonthKey}`;
+            const currentExports = parseInt(localStorage.getItem(exportStorageKey) || '0', 10);
+
+            const access = await checkFeatureAccess(user, 'export', currentExports);
+            if (!access.allowed) {
+                setLimitModal({
+                    title: lang === 'en' ? 'Monthly Export Limit Exceeded' : 'Batas Ekspor Excel Terlampaui',
+                    message: t('limits.exportLimit', { limit: access.limit }) || `Pengguna FREE memiliki batas ${access.limit} ekspor per bulan. Upgrade ke Paket Premium untuk ekspor tanpa batas!`
+                });
+                return;
+            }
+
             const isUsd = currency === 'USD';
             const numFmt = isUsd ? '$#,##0.00' : '#,##0';
             const incomeLabel = isUsd ? 'Income' : 'Pemasukan';
@@ -807,8 +833,8 @@ const AdminDashboard = () => {
 
             // ── 3. Build Multi-Sheet Workbook with Formulas ──
             const workbook = new ExcelJS.Workbook();
-            workbook.creator = 'FinTrack Financial Intelligence';
-            workbook.lastModifiedBy = user?.email || 'FinTrack Admin';
+            workbook.creator = 'Keuangan Financial Intelligence';
+            workbook.lastModifiedBy = user?.email || 'Keuangan Admin';
             workbook.created = new Date();
             workbook.modified = new Date();
 
@@ -835,7 +861,7 @@ const AdminDashboard = () => {
             // Title Banner
             summarySheet.mergeCells('A1:H1');
             const titleCell = summarySheet.getCell('A1');
-            titleCell.value = 'FINTRACK FINANCIAL INTELLIGENCE REPORT';
+            titleCell.value = 'KEUANGAN FINANCIAL INTELLIGENCE REPORT';
             titleCell.font = { name: 'Arial', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
             titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -844,7 +870,7 @@ const AdminDashboard = () => {
             // Subtitle metadata
             summarySheet.mergeCells('A2:H2');
             const subTitleCell = summarySheet.getCell('A2');
-            subTitleCell.value = `Export Date: ${new Date().toLocaleDateString('en-GB')} | Currency: ${currency} | User: ${user?.email || 'FinTrack User'}`;
+            subTitleCell.value = `Export Date: ${new Date().toLocaleDateString('en-GB')} | Currency: ${currency} | User: ${user?.email || 'Keuangan User'}`;
             subTitleCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
             subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
             summarySheet.getRow(2).height = 20;
@@ -858,7 +884,8 @@ const AdminDashboard = () => {
 
             const totalRowsData = filteredTransactions.length;
             const dataEndRow = Math.max(totalRowsData + 1, 2);
-            const dataSheetRef = `'Data Transaksi'`;
+            const dataSheetName = isUsd ? 'Transactions Data' : 'Data Transaksi';
+            const dataSheetRef = `'${dataSheetName}'`;
 
             // Calculate precomputed values for fallback results
             const calcTotalIncome = filteredTransactions
@@ -881,7 +908,7 @@ const AdminDashboard = () => {
             summarySheet.mergeCells('A6:B6');
             const revValCell = summarySheet.getCell('A6');
             revValCell.value = {
-                formula: `SUMIF(${dataSheetRef}!C$2:C$${dataEndRow}, "${incomeLabel}", ${dataSheetRef}!E$2:E$${dataEndRow})`,
+                formula: `SUM(${dataSheetRef}!E$2:E$${dataEndRow})`,
                 result: calcTotalIncome
             };
             revValCell.font = { size: 14, bold: true, color: { argb: 'FF047857' } };
@@ -899,7 +926,7 @@ const AdminDashboard = () => {
             summarySheet.mergeCells('C6:D6');
             const expValCell = summarySheet.getCell('C6');
             expValCell.value = {
-                formula: `SUMIF(${dataSheetRef}!C$2:C$${dataEndRow}, "${expenseLabel}", ${dataSheetRef}!E$2:E$${dataEndRow})`,
+                formula: `SUM(${dataSheetRef}!F$2:F$${dataEndRow})`,
                 result: calcTotalExpense
             };
             expValCell.font = { size: 14, bold: true, color: { argb: 'FFBE123C' } };
@@ -943,8 +970,9 @@ const AdminDashboard = () => {
             countValCell.alignment = { horizontal: 'center', vertical: 'middle' };
             countValCell.numFmt = '#,##0';
 
-            ['A5','B5','A6','B6','C5','D5','C6','D6','E5','F5','E6','F6','G5','H5','G6','H6'].forEach(addr => {
-                summarySheet.getCell(addr).border = thinBorder;
+            ['A','B','C','D','E','F','G','H'].forEach(col => {
+                summarySheet.getCell(`${col}5`).border = thinBorder;
+                summarySheet.getCell(`${col}6`).border = thinBorder;
             });
 
             // Section 2: Category Breakdown Table
@@ -985,14 +1013,15 @@ const AdminDashboard = () => {
                 cellIdx.alignment = { horizontal: 'center' };
 
                 // Category Name
+                const catDisplay = cat.charAt(0).toUpperCase() + cat.slice(1);
                 const cellCat = summarySheet.getCell(`B${currentCatRow}`);
-                cellCat.value = cat.charAt(0).toUpperCase() + cat.slice(1);
+                cellCat.value = catDisplay;
                 cellCat.font = { bold: true };
 
-                // Amount Formula: SUMIFS
+                // Amount Formula: SUMIF on Category (Col C) and Expense (Col F)
                 const cellAmt = summarySheet.getCell(`C${currentCatRow}`);
                 cellAmt.value = {
-                    formula: `SUMIFS(${dataSheetRef}!E$2:E$${dataEndRow}, ${dataSheetRef}!C$2:C$${dataEndRow}, "${expenseLabel}", ${dataSheetRef}!D$2:D$${dataEndRow}, "${cat}")`,
+                    formula: `SUMIF(${dataSheetRef}!C$2:C$${dataEndRow}, "${catDisplay}", ${dataSheetRef}!F$2:F$${dataEndRow})`,
                     result: amtVal
                 };
                 cellAmt.numFmt = numFmt;
@@ -1072,43 +1101,58 @@ const AdminDashboard = () => {
             // ══════════════════════════════════════════════════════
             // SHEET 2: RAW TRANSACTIONS DATA (DATA TRANSAKSI)
             // ══════════════════════════════════════════════════════
-            const dataSheet = workbook.addWorksheet(isUsd ? 'Transactions Data' : 'Data Transaksi');
+            const dataSheet = workbook.addWorksheet(dataSheetName);
             dataSheet.views = [{ showGridLines: true }];
 
-            // Header columns
+            // Header columns: standard accounting ledger format
             dataSheet.columns = [
                 { header: isUsd ? 'No' : 'No',                      key: 'no',          width: 8 },
-                { header: isUsd ? 'Date' : 'Tanggal',               key: 'tanggal',     width: 18 },
-                { header: isUsd ? 'Type' : 'Tipe',                  key: 'tipe',        width: 16 },
-                { header: isUsd ? 'Category' : 'Kategori',          key: 'kategori',    width: 24 },
-                { header: isUsd ? 'Amount' : 'Nominal',             key: 'nominal',     width: 20 },
-                { header: isUsd ? 'Description' : 'Keterangan',     key: 'keterangan',  width: 36 },
+                { header: isUsd ? 'Date' : 'Tanggal',               key: 'tanggal',     width: 16 },
+                { header: isUsd ? 'Category' : 'Kategori',          key: 'kategori',    width: 22 },
+                { header: isUsd ? 'Description' : 'Keterangan',     key: 'keterangan',  width: 34 },
+                { header: isUsd ? 'Income' : 'Pemasukan',           key: 'pemasukan',   width: 18 },
+                { header: isUsd ? 'Expense' : 'Pengeluaran',        key: 'pengeluaran', width: 18 },
+                { header: isUsd ? 'Balance' : 'Saldo',              key: 'saldo',       width: 20 },
             ];
 
             // Style Table Header Row
             const dataHeaderRow = dataSheet.getRow(1);
             dataHeaderRow.height = 24;
-            ['A','B','C','D','E','F'].forEach((col, i) => {
+            ['A','B','C','D','E','F','G'].forEach((col, i) => {
                 const cell = dataSheet.getCell(`${col}1`);
                 cell.font  = { bold: true, color: { argb: 'FFFFFFFF' }, name: 'Arial', size: 10 };
                 cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
-                cell.alignment = { horizontal: i === 4 ? 'right' : (i === 0 || i === 1 || i === 2 ? 'center' : 'left'), vertical: 'middle' };
+                cell.alignment = {
+                    horizontal: (i === 4 || i === 5 || i === 6) ? 'right' : ((i === 0 || i === 1) ? 'center' : 'left'),
+                    vertical: 'middle'
+                };
                 cell.border = thinBorder;
             });
 
             // Populate Data Rows
-            let grandTotalRaw = 0;
+            let runningBalance = 0;
             filteredTransactions.forEach((t, idx) => {
+                const rowNum = idx + 2;
                 const amtNumber = isUsd ? +(Number(t.amount) / exchangeRate).toFixed(2) : Number(t.amount);
-                grandTotalRaw += amtNumber;
+                const isIncome = t.type === 'pemasukan';
+                const incomeVal = isIncome ? amtNumber : 0;
+                const expenseVal = isIncome ? 0 : amtNumber;
+                runningBalance += (isIncome ? amtNumber : -amtNumber);
+
+                const saldoFormula = rowNum === 2 ? `E2-F2` : `G${rowNum - 1}+E${rowNum}-F${rowNum}`;
+                const catDisplay = t.category ? (t.category.charAt(0).toUpperCase() + t.category.slice(1)) : 'Lainnya';
 
                 const rowData = {
                     no:         idx + 1,
                     tanggal:    displayDate(t.date),
-                    tipe:       t.type === 'pemasukan' ? incomeLabel : expenseLabel,
-                    kategori:   t.category ? (t.category.charAt(0).toUpperCase() + t.category.slice(1)) : 'Lainnya',
-                    nominal:    amtNumber,
+                    kategori:   catDisplay,
                     keterangan: (t.description && t.description !== '-') ? t.description : '-',
+                    pemasukan:  incomeVal,
+                    pengeluaran: expenseVal,
+                    saldo: {
+                        formula: saldoFormula,
+                        result: runningBalance
+                    }
                 };
                 const row = dataSheet.addRow(rowData);
                 row.height = 19;
@@ -1118,9 +1162,9 @@ const AdminDashboard = () => {
                     cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
                     cell.border = thinBorder;
                     cell.font   = { name: 'Arial', size: 10, color: { argb: 'FF0F172A' } };
-                    if (colNum === 1 || colNum === 2 || colNum === 3) {
+                    if (colNum === 1 || colNum === 2) {
                         cell.alignment = { horizontal: 'center', vertical: 'middle' };
-                    } else if (colNum === 5) {
+                    } else if (colNum === 5 || colNum === 6 || colNum === 7) {
                         cell.alignment = { horizontal: 'right', vertical: 'middle' };
                         cell.numFmt = numFmt;
                     } else {
@@ -1131,28 +1175,44 @@ const AdminDashboard = () => {
 
             // Table Footer: Grand Total Row with SUM Formula
             const totalRowIndex = filteredTransactions.length + 2;
+            const lastDataRow = Math.max(totalRowIndex - 1, 2);
             const footerRow = dataSheet.getRow(totalRowIndex);
-            footerRow.height = 22;
+            footerRow.height = 24;
 
             dataSheet.mergeCells(`A${totalRowIndex}:D${totalRowIndex}`);
             const grandTotalLabel = dataSheet.getCell(`A${totalRowIndex}`);
-            grandTotalLabel.value = isUsd ? 'GRAND TOTAL (KESELURUHAN)' : 'TOTAL KESELURUHAN (GRAND TOTAL)';
+            grandTotalLabel.value = isUsd ? 'TOTAL KESELURUHAN (GRAND TOTAL)' : 'TOTAL KESELURUHAN';
             grandTotalLabel.font = { bold: true, name: 'Arial', size: 10, color: { argb: 'FF0F172A' } };
             grandTotalLabel.alignment = { horizontal: 'center', vertical: 'middle' };
 
-            const grandTotalCell = dataSheet.getCell(`E${totalRowIndex}`);
-            grandTotalCell.value = {
-                formula: `SUM(E2:E${totalRowIndex - 1})`,
-                result: grandTotalRaw
+            const totalIncomeCell = dataSheet.getCell(`E${totalRowIndex}`);
+            totalIncomeCell.value = {
+                formula: `SUM(E2:E${lastDataRow})`,
+                result: calcTotalIncome
             };
-            grandTotalCell.font = { bold: true, name: 'Arial', size: 11, color: { argb: 'FF1D4ED8' } };
-            grandTotalCell.numFmt = numFmt;
-            grandTotalCell.alignment = { horizontal: 'right', vertical: 'middle' };
+            totalIncomeCell.font = { bold: true, name: 'Arial', size: 10, color: { argb: 'FF047857' } };
+            totalIncomeCell.numFmt = numFmt;
+            totalIncomeCell.alignment = { horizontal: 'right', vertical: 'middle' };
 
-            const emptyCellF = dataSheet.getCell(`F${totalRowIndex}`);
-            emptyCellF.value = '';
+            const totalExpenseCell = dataSheet.getCell(`F${totalRowIndex}`);
+            totalExpenseCell.value = {
+                formula: `SUM(F2:F${lastDataRow})`,
+                result: calcTotalExpense
+            };
+            totalExpenseCell.font = { bold: true, name: 'Arial', size: 10, color: { argb: 'FFBE123C' } };
+            totalExpenseCell.numFmt = numFmt;
+            totalExpenseCell.alignment = { horizontal: 'right', vertical: 'middle' };
 
-            ['A','B','C','D','E','F'].forEach(col => {
+            const finalBalanceCell = dataSheet.getCell(`G${totalRowIndex}`);
+            finalBalanceCell.value = {
+                formula: `E${totalRowIndex}-F${totalRowIndex}`,
+                result: calcNet
+            };
+            finalBalanceCell.font = { bold: true, name: 'Arial', size: 11, color: { argb: 'FF1D4ED8' } };
+            finalBalanceCell.numFmt = numFmt;
+            finalBalanceCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+            ['A','B','C','D','E','F','G'].forEach(col => {
                 const c = dataSheet.getCell(`${col}${totalRowIndex}`);
                 c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
                 c.border = doubleBottomBorder;
@@ -1166,14 +1226,15 @@ const AdminDashboard = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `FinTrack_Report_${currency}_${new Date().toISOString().split('T')[0]}.xlsx`;
+            a.download = `Keuangan_Report_${currency}_${new Date().toISOString().split('T')[0]}.xlsx`;
             a.click();
             URL.revokeObjectURL(url);
-            showToast('Laporan Excel profesional & ber-rumus berhasil diunduh!');
+            localStorage.setItem(exportStorageKey, (currentExports + 1).toString());
+            showToast(t('export.success') || 'Laporan Excel berhasil diekspor!');
 
         } catch (error) {
             console.error('Error exporting to excel:', error);
-            showToast('Gagal mengekspor laporan excel.', 'error');
+            showToast(t('export.failed') || 'Gagal mengekspor laporan excel.', 'error');
         }
     };
 
@@ -1408,10 +1469,10 @@ const AdminDashboard = () => {
 
     // Chart Data
     const chartData = {
-        labels: chartDates.length > 0 ? chartDates : ['Belum Ada Data'],
+        labels: chartDates.length > 0 ? chartDates : [t('public.noExpenseData') || 'Belum Ada Data'],
         datasets: [
             {
-                label: 'Arus Kas Bersih',
+                label: t('public.netCashflow') || 'Arus Kas Bersih',
                 data: chartNetFlows.length > 0 ? chartNetFlows : [0],
                 borderColor: '#3b82f6', // blue-500
                 backgroundColor: 'rgba(59, 130, 246, 0.06)',
@@ -1432,7 +1493,7 @@ const AdminDashboard = () => {
         }
     });
 
-    const doughnutLabels = Object.keys(expenseByCategory);
+    const doughnutLabels = Object.keys(expenseByCategory).map(cat => getCategoryLabel(cat));
     const doughnutData = Object.values(expenseByCategory);
 
     // Sort categories by amount descending
@@ -1571,11 +1632,11 @@ const AdminDashboard = () => {
                             const usd = Number(val) / exchangeRate;
                             const absUsd = Math.abs(usd);
                             const sign = usd < 0 ? '-' : '';
-                            return `${sign}${absUsd >= 1000 ? (absUsd / 1000).toFixed(1) + 'k' : absUsd.toFixed(0)}`;
+                            return `${sign}$${absUsd >= 1000 ? (absUsd / 1000).toFixed(1) + 'k' : absUsd.toFixed(0)}`;
                         }
                         const absVal = Math.abs(Number(val));
                         const sign = Number(val) < 0 ? '-' : '';
-                        return `${sign}Rp${absVal >= 1000000 ? (absVal / 1000000).toFixed(1) + 'jt' : absVal >= 1000 ? (absVal / 1000).toFixed(0) + 'rb' : absVal}`;
+                        return `${sign}Rp ${absVal >= 1000000 ? (absVal / 1000000).toFixed(1) + 'jt' : absVal >= 1000 ? (absVal / 1000).toFixed(0) + 'rb' : absVal}`;
                     }
                 },
                 border: { display: false }
@@ -1617,10 +1678,10 @@ const AdminDashboard = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-2 rounded-2xl border border-gray-200/80 shadow-xs">
             <div className="flex flex-wrap gap-1.5">
                 {[
-                    { id: 'all', label: 'Semua (All)' },
-                    { id: 'week', label: 'Minggu Ini (This Week)' },
-                    { id: 'month', label: 'Bulan Ini (This Month)' },
-                    { id: 'year', label: 'Tahun Ini (This Year)' }
+                    { id: 'all', label: t('period.all') },
+                    { id: 'week', label: t('period.week') },
+                    { id: 'month', label: t('period.month') },
+                    { id: 'year', label: t('period.year') }
                 ].map((period) => (
                     <button
                         key={period.id}
@@ -1636,7 +1697,7 @@ const AdminDashboard = () => {
             </div>
             <div className="text-xs text-gray-500 font-medium px-3 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{filteredTransactions.length} records</span>
+                <span>{filteredTransactions.length} {t('records')}</span>
             </div>
         </div>
     );
@@ -1655,12 +1716,12 @@ const AdminDashboard = () => {
                     </button>
                     <div className="flex items-center gap-3">
                         <div className="relative">
-                            <img src="/logo.jpg" alt="Logo" className="w-9 h-9 rounded-xl object-cover ring-1 ring-gray-200 shadow-xs" />
+                            <img src="/logo.jpg" alt="Logo Keuangan" className="w-9 h-9 rounded-xl object-cover ring-1 ring-gray-200 shadow-xs" />
                             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-sm font-extrabold text-gray-900 tracking-tight leading-tight">FinTrack</h1>
+                                <h1 className="text-sm font-extrabold text-gray-900 tracking-tight leading-tight">{t('appName')}</h1>
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200/60 rounded">PRO</span>
                             </div>
                             <p className="text-[10px] text-gray-400 font-medium">Financial Intelligence Workspace</p>
@@ -1668,7 +1729,10 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-3 md:gap-4">
+                    {/* Language Switcher */}
+                    <LanguageSwitcher variant="header" />
+
                     {/* Live Currency Switcher (IDR / USD) for Foreign Users / WNA */}
                     <div className="flex items-center bg-gray-100 p-0.5 rounded-xl border border-gray-200/80 shadow-xs">
                         <button
@@ -1700,7 +1764,7 @@ const AdminDashboard = () => {
                     {/* Clock & Global Timezone */}
                     <div className="hidden lg:flex flex-col items-end mr-1 text-right">
                         <span className="text-xs font-semibold text-gray-700">
-                            {currentTime.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                            {currentTime.toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                         <span className="text-[10px] font-mono text-gray-400 flex items-center gap-1">
                             <Clock className="w-3 h-3 text-gray-400" />
@@ -1728,9 +1792,9 @@ const AdminDashboard = () => {
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{user?.email || 'admin@fintrack.id'}</p>
+                            <p className="text-[10px] text-gray-400 truncate max-w-[140px]">{user?.email || 'admin@keuangan.id'}</p>
                         </div>
-                        <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Log Out / Keluar">
+                        <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title={t('header.logoutTitle')}>
                             <LogOut className="w-4 h-4" />
                         </button>
                     </div>
@@ -1752,10 +1816,10 @@ const AdminDashboard = () => {
                 <aside className={`fixed top-0 left-0 bottom-0 md:relative z-[90] w-72 md:w-64 h-screen md:h-auto bg-white border-r border-gray-200/80 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 flex flex-col overflow-y-auto shadow-2xl md:shadow-none`}>
                     <div className="p-4 flex flex-col h-full">
                         <div className="space-y-1 flex-1">
-                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-2">Main Navigation</p>
-                            <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" sublabel="Overview & Analytics" />
-                            <SidebarItem id="transactions" icon={CreditCard} label="Transaksi" sublabel="Income & Expenses" />
-                            <SidebarItem id="reports" icon={FileText} label="Laporan Keuangan" sublabel="Financial Statements" />
+                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-2">{t('nav.mainNav')}</p>
+                            <SidebarItem id="dashboard" icon={LayoutDashboard} label={t('nav.dashboard')} sublabel={t('nav.dashboardSub')} />
+                            <SidebarItem id="transactions" icon={CreditCard} label={t('nav.transactions')} sublabel={t('nav.transactionsSub')} />
+                            <SidebarItem id="reports" icon={FileText} label={t('nav.reports')} sublabel={t('nav.reportsSub')} />
                             {isAdminUtama && (
                                 <button
                                     onClick={() => { setActiveTab('subscriptions'); setIsSidebarOpen(false); }}
@@ -1767,9 +1831,9 @@ const AdminDashboard = () => {
                                     <div className="flex items-center gap-3">
                                         <Crown className={`w-4 h-4 ${activeTab === 'subscriptions' ? 'text-slate-950' : 'text-amber-500'}`} />
                                         <div>
-                                            <span className="block leading-tight">Kelola Langganan</span>
+                                            <span className="block leading-tight">{t('nav.subscriptions')}</span>
                                             <span className={`block text-[10px] font-normal leading-tight mt-0.5 ${activeTab === 'subscriptions' ? 'text-amber-950' : 'text-gray-400'}`}>
-                                                Subscription Manager
+                                                {t('nav.subscriptionsSub')}
                                             </span>
                                         </div>
                                     </div>
@@ -1781,28 +1845,28 @@ const AdminDashboard = () => {
                                 </button>
                             )}
 
-                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-5">Subscription & Account</p>
+                            <p className="px-3 text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2 mt-5">{t('nav.subsAndAccount')}</p>
                             <Link to="/pricing" className="w-full text-left px-3.5 py-2 text-xs font-bold text-amber-700 bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/60 rounded-xl transition-all flex items-center gap-2.5 mb-1.5 shadow-2xs">
                                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                                 <div>
-                                    <span className="block leading-tight">Upgrade Premium</span>
-                                    <span className="block text-[9px] text-amber-600/80 font-normal">Pricing & Plans</span>
+                                    <span className="block leading-tight">{t('nav.upgradePremium')}</span>
+                                    <span className="block text-[9px] text-amber-600/80 font-normal">{t('nav.pricingSub')}</span>
                                 </div>
                             </Link>
                             <Link to="/my-orders" className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-xl transition-all flex items-center gap-3 mb-1">
                                 <ShoppingBag className="w-4 h-4 text-gray-400" />
                                 <div>
-                                    <span className="block leading-tight font-semibold">Pesanan Saya</span>
-                                    <span className="block text-[10px] text-gray-400">Order Invoices</span>
+                                    <span className="block leading-tight font-semibold">{t('nav.myOrders')}</span>
+                                    <span className="block text-[10px] text-gray-400">{t('nav.ordersSub')}</span>
                                 </div>
                             </Link>
-                            <SidebarItem id="profile" icon={User} label="Profil Akun" sublabel="Security & Settings" />
+                            <SidebarItem id="profile" icon={User} label={t('nav.profile')} sublabel={t('nav.profileSub')} />
                             <Link to="/" target="_blank" className="w-full text-left px-3.5 py-2.5 text-xs font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 rounded-xl transition-all flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Globe className="w-4 h-4 text-gray-400" />
                                     <div>
-                                        <span className="block leading-tight font-semibold">Portal Publik</span>
-                                        <span className="block text-[10px] text-gray-400">Public Website</span>
+                                        <span className="block leading-tight font-semibold">{t('nav.publicPortal')}</span>
+                                        <span className="block text-[10px] text-gray-400">{t('nav.publicSub')}</span>
                                     </div>
                                 </div>
                                 <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
@@ -1811,10 +1875,12 @@ const AdminDashboard = () => {
 
                         <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200/70 mt-auto shadow-2xs">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <div className={`w-2 h-2 rounded-full ${navigator.onLine ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
                                 <div className="flex-1">
-                                    <p className="text-[11px] font-bold text-gray-900">Cloud Engine Active</p>
-                                    <p className="text-[9px] text-gray-500">RLS Encryption • 99.9% Uptime</p>
+                                    <p className="text-[11px] font-bold text-gray-900">
+                                        {navigator.onLine ? `${t('appName')} Engine ${t('engine.active')}` : `${t('appName')} ${t('engine.offline')}`}
+                                    </p>
+                                    <p className="text-[9px] text-gray-500">{t('engine.encryption')} • {t('engine.uptime')}</p>
                                 </div>
                                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
                             </div>
@@ -1828,7 +1894,7 @@ const AdminDashboard = () => {
                         {loading ? (
                             <div className="flex flex-col items-center justify-center min-h-[400px]">
                                 <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                <p className="text-gray-500 animate-pulse text-sm font-medium">Menyiapkan dashboard FinTrack...</p>
+                                <p className="text-gray-500 animate-pulse text-sm font-medium">{t('admin.loadingDashboard')}</p>
                             </div>
                         ) : (
                             <>
@@ -1837,7 +1903,7 @@ const AdminDashboard = () => {
                                     <div>
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                                                FINTRACK WORKSPACE
+                                                {t('admin.workspace')}
                                             </span>
                                             <span className="text-[10px] text-gray-400 font-mono font-medium">
                                                 CURRENCY: {currency}
@@ -2339,19 +2405,19 @@ const AdminDashboard = () => {
                                                             onClick={() => setFormData({ ...formData, type: 'pemasukan' })}
                                                             className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pemasukan' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
-                                                            Pemasukan (Income)
+                                                            {t('transactions.income') || 'Pemasukan'}
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setFormData({ ...formData, type: 'pengeluaran' })}
                                                             className={`py-2 text-xs font-bold rounded-md transition ${formData.type === 'pengeluaran' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-700 hover:text-gray-900'}`}
                                                         >
-                                                            Pengeluaran (Expense)
+                                                            {t('transactions.expense') || 'Pengeluaran'}
                                                         </button>
                                                     </div>
 
                                                     <div>
-                                                        <label htmlFor="trans-date" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Tanggal / Date</label>
+                                                        <label htmlFor="trans-date" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">{t('transactions.date') || 'Tanggal'}</label>
                                                         <div className="relative">
                                                             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                                                             <input
@@ -2366,7 +2432,7 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label htmlFor="trans-amount" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Nominal / Amount ({currency})</label>
+                                                        <label htmlFor="trans-amount" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">{t('transactions.amount') || 'Nominal'} ({currency})</label>
                                                         <div className="relative">
                                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 text-sm font-bold font-mono">{currency === 'USD' ? '$' : 'Rp'}</span>
                                                             <input
@@ -2391,7 +2457,7 @@ const AdminDashboard = () => {
                                                     </div>
 
                                                     <div>
-                                                         <label htmlFor="trans-category-select" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">Kategori / Category</label>
+                                                         <label htmlFor="trans-category-select" className="block text-xs font-semibold text-gray-700 mb-1.5 pl-1">{t('transactions.category') || 'Kategori'}</label>
                                                          <select
                                                              id="trans-category-select"
                                                              aria-label="Pilih Kategori Transaksi"
@@ -2409,10 +2475,10 @@ const AdminDashboard = () => {
                                                              className="w-full bg-white border border-gray-200 text-gray-900 rounded-lg py-2.5 px-4 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition mb-3 cursor-pointer"
                                                              required
                                                          >
-                                                             <option value="" disabled>-- Pilih Kategori --</option>
+                                                             <option value="" disabled>-- {t('transactions.selectCategory') || 'Pilih Kategori'} --</option>
                                                              {CATEGORIES.map(cat => (
                                                                  <option key={cat.id} value={cat.id}>
-                                                                     {cat.icon} {cat.label}
+                                                                     {cat.icon} {t(`categories.${cat.id}`) || cat.label}
                                                                  </option>
                                                              ))}
                                                          </select>
@@ -2488,17 +2554,17 @@ const AdminDashboard = () => {
                                                     <table className="w-full text-left text-sm text-gray-500">
                                                         <thead className="bg-gray-50/90 text-gray-600 font-bold uppercase tracking-wider text-[11px] border-b border-gray-200 sticky top-0 z-10">
                                                             <tr>
-                                                                <th className="px-6 py-3.5 w-1/4">Tanggal / Date</th>
-                                                                <th className="px-6 py-3.5 w-1/4">Kategori / Category</th>
-                                                                <th className="px-6 py-3.5 w-1/4">Nominal / Amount ({currency})</th>
-                                                                <th className="px-6 py-3.5 w-1/4 text-right">Aksi / Actions</th>
+                                                                <th className="px-6 py-3.5 w-1/4">{t('transactions.date') || 'Tanggal'}</th>
+                                                                <th className="px-6 py-3.5 w-1/4">{t('transactions.category') || 'Kategori'}</th>
+                                                                <th className="px-6 py-3.5 w-1/4">{t('transactions.amount') || 'Nominal'} ({currency})</th>
+                                                                <th className="px-6 py-3.5 w-1/4 text-right">{t('transactions.action') || 'Aksi'}</th>
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-100 bg-white">
                                                             {loading ? (
-                                                                <tr><td colSpan="4" className="text-center py-12 text-gray-400">Memuat data...</td></tr>
+                                                                <tr><td colSpan="4" className="text-center py-12 text-gray-400">{t('admin.loading') || 'Memuat data...'}</td></tr>
                                                             ) : filteredTransactions.length === 0 ? (
-                                                                <tr><td colSpan="4" className="text-center py-12 text-gray-400">Belum ada transaksi.</td></tr>
+                                                                <tr><td colSpan="4" className="text-center py-12 text-gray-400">{t('transactions.noTransactions') || 'Belum ada transaksi.'}</td></tr>
                                                             ) : (
                                                                 <AnimatePresence initial={false}>
                                                                     {filteredTransactions.map((t) => (
@@ -2520,7 +2586,7 @@ const AdminDashboard = () => {
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                    <span className="text-gray-800 font-medium">{capitalizeText(t.category)}</span>
+                                                                                    <span className="text-gray-800 font-medium">{getCategoryLabel(t.category)}</span>
                                                                                 </div>
                                                                                 {t.description && t.description !== '-' && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{t.description}</div>}
                                                                             </td>
@@ -2548,9 +2614,9 @@ const AdminDashboard = () => {
                                                 </div>
                                                 <div className="md:hidden p-4 space-y-4">
                                                     {loading ? (
-                                                        <div className="text-center py-4 text-gray-500">Memuat data...</div>
+                                                        <div className="text-center py-4 text-gray-500">{t('admin.loading') || 'Memuat data...'}</div>
                                                     ) : filteredTransactions.length === 0 ? (
-                                                        <div className="text-center py-4 text-gray-500">Belum ada transaksi.</div>
+                                                        <div className="text-center py-4 text-gray-500">{t('transactions.noTransactions') || 'Belum ada transaksi.'}</div>
                                                     ) : (
                                                         <AnimatePresence initial={false}>
                                                             {filteredTransactions.map((t) => (
@@ -2570,7 +2636,7 @@ const AdminDashboard = () => {
                                                                             </p>
                                                                             <div className="flex items-center gap-2 mt-1">
                                                                                 <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                <span className="text-gray-800 font-bold">{capitalizeText(t.category)}</span>
+                                                                                <span className="text-gray-800 font-bold">{getCategoryLabel(t.category)}</span>
                                                                             </div>
                                                                         </div>
                                                                         <span className={`font-bold font-mono ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -2799,25 +2865,25 @@ const AdminDashboard = () => {
                                                                 <table className="w-full text-sm text-left">
                                                                     <thead>
                                                                         <tr className="bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
-                                                                            <th className="px-4 py-3">Tanggal</th>
-                                                                            <th className="px-4 py-3">Tipe</th>
-                                                                            <th className="px-4 py-3">Kategori</th>
-                                                                            <th className="px-4 py-3">Keterangan</th>
-                                                                            <th className="px-4 py-3 text-right">Jumlah</th>
+                                                                            <th className="px-4 py-3">{t('transactions.date') || 'Tanggal'}</th>
+                                                                            <th className="px-4 py-3">{t('transactions.type') || 'Tipe'}</th>
+                                                                            <th className="px-4 py-3">{t('transactions.category') || 'Kategori'}</th>
+                                                                            <th className="px-4 py-3">{t('transactions.description') || 'Keterangan'}</th>
+                                                                            <th className="px-4 py-3 text-right">{t('transactions.amount') || 'Jumlah'}</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody className="divide-y divide-gray-100">
                                                                         {filteredTransactions.length === 0 ? (
-                                                                            <tr><td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-xs italic">Tidak ada data untuk periode ini.</td></tr>
+                                                                            <tr><td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-xs italic">{t('transactions.noTransactions') || 'Tidak ada data untuk periode ini.'}</td></tr>
                                                                         ) : filteredTransactions.slice(0, 15).map((t, idx) => (
                                                                             <tr key={t.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-slate-50/50 hover:bg-slate-100/50'}>
                                                                                 <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{displayDate(t.date)}</td>
                                                                                 <td className="px-4 py-3">
                                                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${t.type === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                                                                        {t.type === 'pemasukan' ? (currency === 'USD' ? 'Income' : 'Masuk') : (currency === 'USD' ? 'Expense' : 'Keluar')}
+                                                                                        {t.type === 'pemasukan' ? (t('type.income') || 'Masuk') : (t('type.expense') || 'Keluar')}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{capitalizeText(t.category)}</td>
+                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{getCategoryLabel(t.category)}</td>
                                                                                 <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{(t.description && t.description !== '-') ? t.description : '—'}</td>
                                                                                 <td className={`px-4 py-3 text-right font-bold tabular-nums ${t.type === 'pemasukan' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                                                                     {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
@@ -2828,7 +2894,7 @@ const AdminDashboard = () => {
                                                                 </table>
                                                                 {filteredTransactions.length > 15 && (
                                                                     <div className="bg-slate-50 p-3 text-center border-t border-gray-200">
-                                                                        <span className="text-xs text-gray-500 italic">Menampilkan 15 transaksi terbaru...</span>
+                                                                        <span className="text-xs text-gray-500 italic">{lang === 'en' ? 'Showing 15 latest transactions...' : 'Menampilkan 15 transaksi terbaru...'}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -3066,13 +3132,13 @@ const AdminDashboard = () => {
                                  onClick={() => setLimitModal(null)}
                                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition"
                              >
-                                 Tutup
+                                 {lang === 'en' ? 'Close' : 'Tutup'}
                              </button>
                              <Link
                                  to="/pricing"
                                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md flex items-center justify-center"
                              >
-                                 Upgrade Premium
+                                 {lang === 'en' ? 'Upgrade to Premium' : 'Upgrade Premium'}
                              </Link>
                          </div>
                      </div>

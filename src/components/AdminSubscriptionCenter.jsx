@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../utils/format';
 import { isSuperAdmin } from '../utils/subscriptionEngine';
+import { useLanguage } from '../hooks/useLanguage';
 
 export const AdminSubscriptionCenter = ({
     user,
@@ -35,6 +36,7 @@ export const AdminSubscriptionCenter = ({
     onDeleteUser,
     isConfirmingOrder
 }) => {
+    const { t, formatCurrency: fmtCurr, formatDate: fmtDate } = useLanguage();
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [userStatusFilter, setUserStatusFilter] = useState('ALL'); // ALL | ACTIVE | FREE | EXPIRED
     const [orderFilter, setOrderFilter] = useState('ALL'); // ALL | PENDING | PAID | CANCELLED | EXPIRED
@@ -45,12 +47,12 @@ export const AdminSubscriptionCenter = ({
                 <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100">
                     <Shield className="w-8 h-8" />
                 </div>
-                <h3 className="text-xl font-black text-gray-900 mb-2">Akses Dibatasi: Khusus Admin Utama</h3>
+                <h3 className="text-xl font-black text-gray-900 mb-2">{t('premium.accessRestricted')}</h3>
                 <p className="text-xs text-gray-600 leading-relaxed mb-4">
-                    Halaman kontrol persetujuan langganan dan seluruh riwayat transaksi pembayaran hanya dapat diakses oleh Admin Utama (<span className="font-mono font-bold text-rose-600">arbain@gmail.com</span>).
+                    {t('premium.accessRestrictedDesc')} (<span className="font-mono font-bold text-rose-600">arbain@gmail.com</span>).
                 </p>
                 <div className="p-3 bg-gray-50 rounded-xl text-left text-xs text-gray-500 font-mono">
-                    Akun saat ini: {user?.email || 'Anonim / Belum Login'}
+                    {t('premium.currentAccount')}: {user?.email || 'Anonim / Belum Login'}
                 </div>
             </div>
         );
@@ -87,10 +89,10 @@ export const AdminSubscriptionCenter = ({
                     <div>
                         <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider mb-3 shadow-sm">
                             <Crown className="w-3.5 h-3.5 text-amber-400" />
-                            PUSAT KONTROL ADMIN UTAMA
+                            {t('premium.adminControlTitle')}
                         </div>
                         <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight">
-                            Kelola Seluruh Pengguna & Persetujuan Langganan
+                            {t('premium.adminControlHeading')}
                         </h3>
                         <p className="text-xs text-slate-300 mt-2 max-w-2xl leading-relaxed">
                             Selamat datang, <span className="font-mono text-amber-300 font-bold">{user?.email || 'arbain@gmail.com'}</span>. Anda memiliki otoritas penuh untuk menyetujui transaksi pembayaran (QRIS Barcode, E-Wallet, Transfer Bank BRI) dan mengontrol status langganan seluruh pengguna website.

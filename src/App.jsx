@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { supabase } from './lib/supabaseClient';
+import { useLanguage } from './hooks/useLanguage';
 
 // Helper to auto-retry dynamic import if Vercel deploys new build chunk assets
 const lazyWithRetry = (componentImport) =>
@@ -36,14 +37,19 @@ const Register = lazyWithRetry(() => import('./pages/Register'));
 const PricingPage = lazyWithRetry(() => import('./pages/PricingPage'));
 const UserOrdersPage = lazyWithRetry(() => import('./pages/UserOrdersPage'));
 
-const LoadingFallback = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700">
-    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-    <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Memuat Halaman...</p>
-  </div>
-);
+const LoadingFallback = () => {
+  const { t } = useLanguage();
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-700">
+      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+      <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">{t('loadingPage')}</p>
+    </div>
+  );
+};
 
 function App() {
+  const { t } = useLanguage();
+
   if (!supabase) {
     return (
       <main className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
@@ -102,8 +108,8 @@ function App() {
                     <h1 className="text-7xl font-extrabold text-blue-600 mb-3 tracking-tight">404</h1>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Halaman Tidak Ditemukan</h2>
                     <p className="text-gray-500 max-w-sm mb-6 text-sm">Halaman yang Anda tuju tidak tersedia atau telah dipindahkan.</p>
-                    <a href="/" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition shadow-sm">
-                      Kembali ke Beranda
+                    <a href="/" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition shadow-xs">
+                      {t('back')}
                     </a>
                   </div>
                 }

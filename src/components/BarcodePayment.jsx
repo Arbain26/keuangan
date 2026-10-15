@@ -44,7 +44,7 @@ const BarcodePayment = ({
         const generateQR = async () => {
             try {
                 // QRIS payload format representation with order and amount
-                const qrisPayload = `00020101021226670014ID.LINKAJA.WWW01189360091400202409260215${NMID}0303UME51440014ID.CO.QRIS.WWW0215${orderId || 'ORD-FINTRACK'}52045499530336054${totalAmount ? String(totalAmount).length : 5}${totalAmount || 29000}5802ID5915${MERCHANT_NAME}6007JAKARTA6304ABCD`;
+                const qrisPayload = `00020101021226670014ID.LINKAJA.WWW01189360091400202409260215${NMID}0303UME51440014ID.CO.QRIS.WWW0215${orderId || 'ORD-KEUANGAN'}52045499530336054${totalAmount ? String(totalAmount).length : 5}${totalAmount || 29000}5802ID5915${MERCHANT_NAME}6007JAKARTA6304ABCD`;
                 
                 const url = await QRCode.toDataURL(qrisPayload, {
                     width: 400,
@@ -73,7 +73,7 @@ const BarcodePayment = ({
     const handleDownloadBarcode = () => {
         if (!qrDataUrl) return;
         const link = document.createElement('a');
-        link.download = `QRIS-Barcode-${orderId || 'FinTrack'}.png`;
+        link.download = `QRIS-Barcode-${orderId || 'Keuangan'}.png`;
         link.href = qrDataUrl;
         document.body.appendChild(link);
         link.click();
@@ -82,7 +82,7 @@ const BarcodePayment = ({
 
     // WhatsApp Confirmation Message
     const generateWhatsAppUrl = () => {
-        const text = `Halo Admin Arbain, saya sudah melakukan pembayaran langganan FinTrack Premium:
+        const text = `Halo Admin Arbain, saya sudah melakukan pembayaran langganan Keuangan Premium:
 - Order ID: ${orderId || '-'}
 - Paket: ${planName || 'Paket Premium'}
 - Total: ${formatCurrency(totalAmount)}

@@ -13,9 +13,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'FinTrack System',
-        short_name: 'FinTrack',
-        description: 'Dashboard Sistem Keuangan FinTrack',
+        name: 'Keuangan',
+        short_name: 'Keuangan',
+        description: 'Aplikasi Pengelola Keuangan Cerdas dan Transparan',
         theme_color: '#f9fafb',
         background_color: '#f9fafb',
         display: 'standalone',
