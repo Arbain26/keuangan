@@ -56,7 +56,7 @@ ChartJS.register(
 
 const capitalizeText = (str) => {
     if (!str) return '';
-    return str.split(' ').map(word => {
+    return String(str).split(' ').map(word => {
         if (!word) return '';
         return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     }).join(' ');
@@ -95,7 +95,7 @@ const getCellValue = (cell) => {
     
     // If it is rich text
     if (typeof val === 'object' && Array.isArray(val.richText)) {
-        return val.richText.map(t => t.text || '').join('');
+        return val.richText.map(item => item.text || '').join('');
     }
     
     return val;
@@ -226,10 +226,23 @@ const AdminDashboard = () => {
 
     const getCategoryLabel = (cat) => {
         if (!cat) return t('categories.lainnya') || 'Lainnya';
-        const key = cat.trim().toLowerCase();
+        const key = typeof cat === 'string' ? cat.trim().toLowerCase() : String(cat).trim().toLowerCase();
         const translated = t(`categories.${key}`);
         if (translated && !translated.startsWith('categories.')) return translated;
-        return capitalizeText(cat);
+        return capitalizeText(String(cat));
+    };
+
+    const getWeekdayLabel = (dateString, isShort = false) => {
+        if (!dateString) return '';
+        try {
+            const parsed = parseSafeDate(dateString);
+            if (!parsed || isNaN(parsed.getTime())) return '';
+            return parsed.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', {
+                weekday: isShort ? 'short' : 'long'
+            });
+        } catch {
+            return '';
+        }
     };
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [transactions, setTransactions] = useState([]);
@@ -763,10 +776,10 @@ const AdminDashboard = () => {
             // ── 1. Aggregate category spending for the chart ──
             const categoryTotals = {};
             filteredTransactions
-                .filter(t => t.type === 'pengeluaran')
-                .forEach(t => {
-                    const cat = t.category || 'Lainnya';
-                    categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(t.amount);
+                .filter(tx => tx.type === 'pengeluaran')
+                .forEach(tx => {
+                    const cat = tx.category || 'Lainnya';
+                    categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(tx.amount);
                 });
             const sortedCategories = Object.entries(categoryTotals)
                 .sort((a, b) => b[1] - a[1])
@@ -889,12 +902,12 @@ const AdminDashboard = () => {
 
             // Calculate precomputed values for fallback results
             const calcTotalIncome = filteredTransactions
-                .filter(t => t.type === 'pemasukan')
-                .reduce((s, t) => s + (isUsd ? +(Number(t.amount) / exchangeRate) : Number(t.amount)), 0);
+                .filter(tx => tx.type === 'pemasukan')
+                .reduce((s, tx) => s + (isUsd ? +(Number(tx.amount) / exchangeRate) : Number(tx.amount)), 0);
 
             const calcTotalExpense = filteredTransactions
-                .filter(t => t.type === 'pengeluaran')
-                .reduce((s, t) => s + (isUsd ? +(Number(t.amount) / exchangeRate) : Number(t.amount)), 0);
+                .filter(tx => tx.type === 'pengeluaran')
+                .reduce((s, tx) => s + (isUsd ? +(Number(tx.amount) / exchangeRate) : Number(tx.amount)), 0);
 
             const calcNet = calcTotalIncome - calcTotalExpense;
 
@@ -1131,22 +1144,22 @@ const AdminDashboard = () => {
 
             // Populate Data Rows
             let runningBalance = 0;
-            filteredTransactions.forEach((t, idx) => {
+            filteredTransactions.forEach((tx, idx) => {
                 const rowNum = idx + 2;
-                const amtNumber = isUsd ? +(Number(t.amount) / exchangeRate).toFixed(2) : Number(t.amount);
-                const isIncome = t.type === 'pemasukan';
+                const amtNumber = isUsd ? +(Number(tx.amount) / exchangeRate).toFixed(2) : Number(tx.amount);
+                const isIncome = tx.type === 'pemasukan';
                 const incomeVal = isIncome ? amtNumber : 0;
                 const expenseVal = isIncome ? 0 : amtNumber;
                 runningBalance += (isIncome ? amtNumber : -amtNumber);
 
                 const saldoFormula = rowNum === 2 ? `E2-F2` : `G${rowNum - 1}+E${rowNum}-F${rowNum}`;
-                const catDisplay = t.category ? (t.category.charAt(0).toUpperCase() + t.category.slice(1)) : 'Lainnya';
+                const catDisplay = tx.category ? (tx.category.charAt(0).toUpperCase() + tx.category.slice(1)) : 'Lainnya';
 
                 const rowData = {
                     no:         idx + 1,
-                    tanggal:    displayDate(t.date),
+                    tanggal:    displayDate(tx.date),
                     kategori:   catDisplay,
-                    keterangan: (t.description && t.description !== '-') ? t.description : '-',
+                    keterangan: (tx.description && tx.description !== '-') ? tx.description : '-',
                     pemasukan:  incomeVal,
                     pengeluaran: expenseVal,
                     saldo: {
@@ -1255,12 +1268,12 @@ const AdminDashboard = () => {
             
             const transactionsToImport = [];
             const seenSignatures = new Set(
-                transactions.map(t => {
-                    const tDate = t.date ? t.date.split('T')[0] : '';
-                    const tType = (t.type || '').toLowerCase();
-                    const tCategory = (t.category || '').trim().toLowerCase();
-                    const tAmount = Number(t.amount) || 0;
-                    const tDesc = (t.description || '').trim().toLowerCase();
+                transactions.map(tx => {
+                    const tDate = tx.date ? tx.date.split('T')[0] : '';
+                    const tType = (tx.type || '').toLowerCase();
+                    const tCategory = (tx.category || '').trim().toLowerCase();
+                    const tAmount = Number(tx.amount) || 0;
+                    const tDesc = (tx.description || '').trim().toLowerCase();
                     return `${tDate}_${tType}_${tCategory}_${tAmount}_${tDesc}`;
                 })
             );
@@ -1359,8 +1372,8 @@ const AdminDashboard = () => {
                 return;
             }
 
-            for (const t of transactionsToImport) {
-                await createTransaction(t);
+            for (const tx of transactionsToImport) {
+                await createTransaction(tx);
             }
 
             const data = await fetchTransactions();
@@ -1417,11 +1430,11 @@ const AdminDashboard = () => {
     }, [activeTab]);
 
     // Filter Logic
-    const filteredTransactions = transactions.filter(t => {
-        const matchesSearch = (t.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (t.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+    const filteredTransactions = transactions.filter(tx => {
+        const matchesSearch = (tx.category?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+            (tx.description?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
-        const tDate = parseSafeDate(t.date);
+        const tDate = parseSafeDate(tx.date);
         const now = new Date();
 
         let matchesPeriod = true;
@@ -1443,22 +1456,22 @@ const AdminDashboard = () => {
     });
 
     // Stats Calculation
-    const totalIncome = filteredTransactions.filter(t => t.type === 'pemasukan').reduce((acc, t) => acc + Number(t.amount), 0);
-    const totalExpense = filteredTransactions.filter(t => t.type === 'pengeluaran').reduce((acc, t) => acc + Number(t.amount), 0);
+    const totalIncome = filteredTransactions.filter(tx => tx.type === 'pemasukan').reduce((acc, tx) => acc + Number(tx.amount), 0);
+    const totalExpense = filteredTransactions.filter(tx => tx.type === 'pengeluaran').reduce((acc, tx) => acc + Number(tx.amount), 0);
     const balance = totalIncome - totalExpense;
 
     // Group transactions by date for line chart
     const aggregatedFlow = {};
-    filteredTransactions.forEach(t => {
-        const dateStr = formatDate(t.date);
-        const amount = Number(t.amount);
-        const net = t.type === 'pemasukan' ? amount : -amount;
+    filteredTransactions.forEach(tx => {
+        const dateStr = formatDate(tx.date);
+        const amount = Number(tx.amount);
+        const net = tx.type === 'pemasukan' ? amount : -amount;
         aggregatedFlow[dateStr] = (aggregatedFlow[dateStr] || 0) + net;
     });
 
     const distinctDates = [];
-    filteredTransactions.forEach(t => {
-        const dateStr = formatDate(t.date);
+    filteredTransactions.forEach(tx => {
+        const dateStr = formatDate(tx.date);
         if (!distinctDates.includes(dateStr)) {
             distinctDates.push(dateStr);
         }
@@ -1486,10 +1499,10 @@ const AdminDashboard = () => {
 
     // Doughnut Chart Data for Admin Dashboard (based on filteredTransactions)
     const expenseByCategory = {};
-    filteredTransactions.forEach(t => {
-        if (t.type === 'pengeluaran') {
-            const category = normalizeCategory(t.category, t.type);
-            expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(t.amount);
+    filteredTransactions.forEach(tx => {
+        if (tx.type === 'pengeluaran') {
+            const category = normalizeCategory(tx.category, tx.type);
+            expenseByCategory[category] = (expenseByCategory[category] || 0) + Number(tx.amount);
         }
     });
 
@@ -2567,9 +2580,9 @@ const AdminDashboard = () => {
                                                                 <tr><td colSpan="4" className="text-center py-12 text-gray-400">{t('transactions.noTransactions') || 'Belum ada transaksi.'}</td></tr>
                                                             ) : (
                                                                 <AnimatePresence initial={false}>
-                                                                    {filteredTransactions.map((t) => (
+                                                                    {filteredTransactions.map((tx) => (
                                                                         <motion.tr 
-                                                                            key={t.id}
+                                                                            key={tx.id}
                                                                             layout
                                                                             initial={{ opacity: 0, y: 10 }}
                                                                             animate={{ opacity: 1, y: 0 }}
@@ -2578,29 +2591,29 @@ const AdminDashboard = () => {
                                                                             className="hover:bg-gray-50/50 transition"
                                                                         >
                                                                             <td className="px-6 py-4">
-                                                                                <div className="text-gray-800 font-medium">{displayDate(t.date)}</div>
+                                                                                <div className="text-gray-800 font-medium">{displayDate(tx.date)}</div>
                                                                                 <div className="text-xs text-gray-400 capitalize">
-                                                                                    {parseSafeDate(t.date)?.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', { weekday: 'long' }) || ''}
+                                                                                    {getWeekdayLabel(tx.date, false)}
                                                                                 </div>
                                                                             </td>
                                                                             <td className="px-6 py-4">
                                                                                 <div className="flex items-center gap-2">
-                                                                                    <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                    <span className="text-gray-800 font-medium">{getCategoryLabel(t.category)}</span>
+                                                                                    <span className={`w-2 h-2 rounded-full ${tx.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                                                                    <span className="text-gray-800 font-medium">{getCategoryLabel(tx.category)}</span>
                                                                                 </div>
-                                                                                {t.description && t.description !== '-' && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{t.description}</div>}
+                                                                                {tx.description && tx.description !== '-' && <div className="text-xs text-gray-400 mt-1 truncate max-w-[150px]">{tx.description}</div>}
                                                                             </td>
                                                                             <td className="px-6 py-4">
-                                                                                <span className={`font-semibold font-mono ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
+                                                                                <span className={`font-semibold font-mono ${tx.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                                    {tx.type === 'pemasukan' ? '+' : '-'} {displayCurrency(tx.amount)}
                                                                                 </span>
                                                                             </td>
                                                                             <td className="px-6 py-4 text-right">
                                                                                 <div className="flex justify-end gap-2">
-                                                                                    <button onClick={() => handleEdit(t)} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Edit">
+                                                                                    <button onClick={() => handleEdit(tx)} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition" title="Edit">
                                                                                         <Edit2 className="w-4 h-4" />
                                                                                     </button>
-                                                                                    <button onClick={() => handleDelete(t.id)} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete">
+                                                                                    <button onClick={() => handleDelete(tx.id)} className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete">
                                                                                         <Trash2 className="w-4 h-4" />
                                                                                     </button>
                                                                                 </div>
@@ -2619,9 +2632,9 @@ const AdminDashboard = () => {
                                                         <div className="text-center py-4 text-gray-500">{t('transactions.noTransactions') || 'Belum ada transaksi.'}</div>
                                                     ) : (
                                                         <AnimatePresence initial={false}>
-                                                            {filteredTransactions.map((t) => (
+                                                            {filteredTransactions.map((tx) => (
                                                                 <motion.div 
-                                                                    key={t.id}
+                                                                    key={tx.id}
                                                                     layout
                                                                     initial={{ opacity: 0, y: 10 }}
                                                                     animate={{ opacity: 1, y: 0 }}
@@ -2632,23 +2645,23 @@ const AdminDashboard = () => {
                                                                     <div className="flex justify-between items-start border-b border-gray-100 pb-2">
                                                                         <div>
                                                                             <p className="text-xs text-gray-500 font-medium">
-                                                                                {displayDate(t.date)} • {parseSafeDate(t.date)?.toLocaleDateString(currency === 'USD' ? 'en-US' : 'id-ID', { weekday: 'short' }) || ''}
+                                                                                {displayDate(tx.date)} • {getWeekdayLabel(tx.date, true)}
                                                                             </p>
                                                                             <div className="flex items-center gap-2 mt-1">
-                                                                                <span className={`w-2 h-2 rounded-full ${t.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                                                                                <span className="text-gray-800 font-bold">{getCategoryLabel(t.category)}</span>
+                                                                                <span className={`w-2 h-2 rounded-full ${tx.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                                                                                <span className="text-gray-800 font-bold">{getCategoryLabel(tx.category)}</span>
                                                                             </div>
                                                                         </div>
-                                                                        <span className={`font-bold font-mono ${t.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                            {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
+                                                                        <span className={`font-bold font-mono ${tx.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                            {tx.type === 'pemasukan' ? '+' : '-'} {displayCurrency(tx.amount)}
                                                                         </span>
                                                                     </div>
-                                                                    {t.description && t.description !== '-' && <p className="text-xs text-gray-500 italic">{t.description}</p>}
+                                                                    {tx.description && tx.description !== '-' && <p className="text-xs text-gray-500 italic">{tx.description}</p>}
                                                                     <div className="flex justify-end gap-2 pt-1">
-                                                                        <button onClick={() => handleEdit(t)} className="flex-1 py-2 bg-gray-50 text-gray-700 rounded flex items-center justify-center gap-2 text-xs font-medium border border-gray-200 hover:bg-gray-100">
+                                                                        <button onClick={() => handleEdit(tx)} className="flex-1 py-2 bg-gray-50 text-gray-700 rounded flex items-center justify-center gap-2 text-xs font-medium border border-gray-200 hover:bg-gray-100">
                                                                             <Edit2 className="w-3.5 h-3.5" /> Edit
                                                                         </button>
-                                                                        <button onClick={() => handleDelete(t.id)} className="flex-1 py-2 bg-rose-50 text-rose-600 rounded flex items-center justify-center gap-2 text-xs font-medium border border-rose-200 hover:bg-rose-100">
+                                                                        <button onClick={() => handleDelete(tx.id)} className="flex-1 py-2 bg-rose-50 text-rose-600 rounded flex items-center justify-center gap-2 text-xs font-medium border border-rose-200 hover:bg-rose-100">
                                                                             <Trash2 className="w-3.5 h-3.5" /> Hapus
                                                                         </button>
                                                                     </div>
@@ -2670,10 +2683,10 @@ const AdminDashboard = () => {
                                             const incomeByCategory = {};
                                             const expenseByCategory = {};
 
-                                            filteredTransactions.forEach(t => {
-                                                const cat = capitalizeText(t.category || 'Lainnya');
-                                                const amt = Number(t.amount);
-                                                if (t.type === 'pemasukan') {
+                                            filteredTransactions.forEach(tx => {
+                                                const cat = capitalizeText(tx.category || 'Lainnya');
+                                                const amt = Number(tx.amount);
+                                                if (tx.type === 'pemasukan') {
                                                     incomeByCategory[cat] = (incomeByCategory[cat] || 0) + amt;
                                                 } else {
                                                     expenseByCategory[cat] = (expenseByCategory[cat] || 0) + amt;
@@ -2875,18 +2888,18 @@ const AdminDashboard = () => {
                                                                     <tbody className="divide-y divide-gray-100">
                                                                         {filteredTransactions.length === 0 ? (
                                                                             <tr><td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-xs italic">{t('transactions.noTransactions') || 'Tidak ada data untuk periode ini.'}</td></tr>
-                                                                        ) : filteredTransactions.slice(0, 15).map((t, idx) => (
-                                                                            <tr key={t.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-slate-50/50 hover:bg-slate-100/50'}>
-                                                                                <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{displayDate(t.date)}</td>
+                                                                        ) : filteredTransactions.slice(0, 15).map((tx, idx) => (
+                                                                            <tr key={tx.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-slate-50/50 hover:bg-slate-100/50'}>
+                                                                                <td className="px-4 py-3 text-gray-600 text-xs tabular-nums">{displayDate(tx.date)}</td>
                                                                                 <td className="px-4 py-3">
-                                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${t.type === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                                                                        {t.type === 'pemasukan' ? (t('type.income') || 'Masuk') : (t('type.expense') || 'Keluar')}
+                                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${tx.type === 'pemasukan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                                                        {tx.type === 'pemasukan' ? (t('type.income') || 'Masuk') : (t('type.expense') || 'Keluar')}
                                                                                     </span>
                                                                                 </td>
-                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{getCategoryLabel(t.category)}</td>
-                                                                                <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{(t.description && t.description !== '-') ? t.description : '—'}</td>
-                                                                                <td className={`px-4 py-3 text-right font-bold tabular-nums ${t.type === 'pemasukan' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                                                                    {t.type === 'pemasukan' ? '+' : '-'} {displayCurrency(t.amount)}
+                                                                                <td className="px-4 py-3 font-semibold text-gray-800">{getCategoryLabel(tx.category)}</td>
+                                                                                <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{(tx.description && tx.description !== '-') ? tx.description : '—'}</td>
+                                                                                <td className={`px-4 py-3 text-right font-bold tabular-nums ${tx.type === 'pemasukan' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                                                                    {tx.type === 'pemasukan' ? '+' : '-'} {displayCurrency(tx.amount)}
                                                                                 </td>
                                                                             </tr>
                                                                         ))}
