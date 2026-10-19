@@ -124,29 +124,43 @@ create policy "Allow public read on promo_codes" on public.promo_codes for selec
 drop policy if exists "Allow public read on usage_limits" on public.usage_limits;
 create policy "Allow public read on usage_limits" on public.usage_limits for select to anon, authenticated using (true);
 
+-- Helper function to verify if the requester is the Super Admin
+create or replace function public.is_admin()
+returns boolean as $$
+begin
+  return (auth.jwt() ->> 'email') = 'arbain@gmail.com';
+end;
+$$ language plpgsql security definer;
+
 -- Policies for user subscriptions
 drop policy if exists "Allow users to read their own subscription" on public.user_subscriptions;
-create policy "Allow users to read their own subscription" on public.user_subscriptions for select to authenticated using (auth.uid() = user_id or true);
+create policy "Allow users to read their own subscription" on public.user_subscriptions for select to authenticated using (auth.uid() = user_id or public.is_admin());
 
 drop policy if exists "Allow users to write subscription" on public.user_subscriptions;
-create policy "Allow users to write subscription" on public.user_subscriptions for all to authenticated using (true) with check (true);
+create policy "Allow users to insert subscription" on public.user_subscriptions for insert to authenticated with check (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "Allow admin update subscription" on public.user_subscriptions;
+create policy "Allow admin update subscription" on public.user_subscriptions for update to authenticated using (public.is_admin() or auth.uid() = user_id) with check (public.is_admin() or auth.uid() = user_id);
+
+drop policy if exists "Allow admin delete subscription" on public.user_subscriptions;
+create policy "Allow admin delete subscription" on public.user_subscriptions for delete to authenticated using (public.is_admin());
 
 -- Policies for orders
 drop policy if exists "Allow users to read orders" on public.orders;
-create policy "Allow users to read orders" on public.orders for select to authenticated using (auth.uid() = user_id or true);
+create policy "Allow users to read orders" on public.orders for select to authenticated using (auth.uid() = user_id or public.is_admin());
 
 drop policy if exists "Allow users to insert orders" on public.orders;
-create policy "Allow users to insert orders" on public.orders for insert to authenticated with check (true);
+create policy "Allow users to insert orders" on public.orders for insert to authenticated with check (auth.uid() = user_id);
 
 drop policy if exists "Allow admin to update orders" on public.orders;
-create policy "Allow admin to update orders" on public.orders for update to authenticated using (true) with check (true);
+create policy "Allow admin to update orders" on public.orders for update to authenticated using (public.is_admin()) with check (public.is_admin());
 
--- Policies for admin write on plans, promo_codes, usage_limits
+-- Policies for admin write on plans, promo_codes, usage_limits (ADMIN ONLY)
 drop policy if exists "Allow admin all on plans" on public.plans;
-create policy "Allow admin all on plans" on public.plans for all to authenticated using (true) with check (true);
+create policy "Allow admin all on plans" on public.plans for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "Allow admin all on promo_codes" on public.promo_codes;
-create policy "Allow admin all on promo_codes" on public.promo_codes for all to authenticated using (true) with check (true);
+create policy "Allow admin all on promo_codes" on public.promo_codes for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "Allow admin all on usage_limits" on public.usage_limits;
-create policy "Allow admin all on usage_limits" on public.usage_limits for all to authenticated using (true) with check (true);
+create policy "Allow admin all on usage_limits" on public.usage_limits for all to authenticated using (public.is_admin()) with check (public.is_admin());

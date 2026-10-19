@@ -50,7 +50,7 @@ export const formatDate = (dateString) => {
     }
 };
 
-export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
+export const normalizeCategory = (categoryInput, type = 'pengeluaran', allowCustom = false) => {
     if (!categoryInput || categoryInput.toString().trim() === '-' || categoryInput.toString().trim() === '') {
         return type === 'pemasukan' ? 'gaji' : 'makanan & minuman';
     }
@@ -69,6 +69,7 @@ export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
     if (['kesehatan', 'obat', 'apotek', 'klinik', 'dokter'].includes(c)) return 'kesehatan';
     if (['gaji', 'gaji/pendapatan', 'pendapatan', 'pemasukan'].includes(c)) return 'gaji';
     if (['investasi'].includes(c)) return 'investasi';
+    if (['lainnya', 'other'].includes(c)) return 'lainnya';
 
     // Keywords check
     if (['spp', 'berkas', 'kuliah', 'kampus', 'seminar', 'skripsi', 'turnitin', 'wisuda', 'ijazah', 'ukt'].some(k => c.includes(k))) return 'pendidikan';
@@ -81,8 +82,24 @@ export const normalizeCategory = (categoryInput, type = 'pengeluaran') => {
     if (type === 'pemasukan' || ['gaji', 'pemasukan', 'transfer', 'thr', 'cashback', 'bonus'].some(k => c.includes(k))) return 'gaji';
     if (['investasi', 'saham', 'reksadana', 'crypto', 'tabungan'].some(k => c.includes(k))) return 'investasi';
 
-    // ALWAYS fallback to standard valid category ID! Never return raw OCR garbage!
+    // If custom categories are allowed or user typed a custom label, retain it
+    if (allowCustom && c.length > 0) {
+        return categoryInput.toString().trim();
+    }
+
+    // Default fallback for automatic scanner or empty values
     return type === 'pemasukan' ? 'gaji' : 'makanan & minuman';
 };
+export const capitalizeText = (str) => {
+    if (!str) return '';
+    return String(str).split(' ').map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+};
 
-
+export const formatNumberInput = (value) => {
+    if (value === null || value === undefined) return '';
+    const clean = value.toString().replace(/\D/g, '');
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+};

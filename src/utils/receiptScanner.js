@@ -17,12 +17,18 @@ export const scanReceiptImage = async (imageFile, onProgress) => {
             worker = await createWorker('eng');
         }
         
-        if (onProgress) {
-            onProgress('Membaca teks dari foto struk...');
+        let text = '';
+        try {
+            if (onProgress) {
+                onProgress('Membaca teks dari foto struk...');
+            }
+            const res = await worker.recognize(imageFile);
+            text = res?.data?.text || '';
+        } finally {
+            if (worker) {
+                await worker.terminate();
+            }
         }
-
-        const { data: { text } } = await worker.recognize(imageFile);
-        await worker.terminate();
 
         const cleanText = text || '';
         const lines = cleanText.split('\n').map(l => l.trim()).filter(Boolean);

@@ -48,6 +48,15 @@ const MONTH_SHORT = {
     en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 };
 
+const SAMPLE_PUBLIC_TRANSACTIONS = [
+    { id: 'demo-1', date: new Date().toISOString().split('T')[0], type: 'pemasukan', category: 'gaji', amount: 8500000, description: 'Pendapatan Proyek & Usaha' },
+    { id: 'demo-2', date: new Date().toISOString().split('T')[0], type: 'pengeluaran', category: 'utilitas', amount: 375000, description: 'Tagihan Listrik & Internet Fiber' },
+    { id: 'demo-3', date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0], type: 'pengeluaran', category: 'makanan & minuman', amount: 145000, description: 'Konsumsi Tim & Operasional' },
+    { id: 'demo-4', date: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0], type: 'pengeluaran', category: 'transportasi', amount: 200000, description: 'Bensin & Saldo E-Toll' },
+    { id: 'demo-5', date: new Date(Date.now() - 86400000 * 8).toISOString().split('T')[0], type: 'pengeluaran', category: 'belanja', amount: 650000, description: 'Perlengkapan Kantor & Stok' },
+    { id: 'demo-6', date: new Date(Date.now() - 86400000 * 12).toISOString().split('T')[0], type: 'pemasukan', category: 'investasi', amount: 1500000, description: 'Imbal Hasil Investasi & Dividen' }
+];
+
 const PublicDashboard = () => {
     const { t, lang, formatCurrency, formatDate, formatCompact } = useLanguage();
     usePageTitle('public.title');
@@ -63,6 +72,7 @@ const PublicDashboard = () => {
         monthlyChartDataIncome: Array(12).fill(0)
     });
     const [transactions, setTransactions] = useState([]);
+    const [isDemoMode, setIsDemoMode] = useState(false);
     const [loading, setLoading] = useState(true);
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -72,11 +82,17 @@ const PublicDashboard = () => {
         const loadData = async () => {
             setLoading(true);
             const data = await fetchTransactions();
-            setTransactions(data || []);
-
             const refDate = new Date(selectedYear, selectedMonth, 1);
-            const calculatedCurrentStats = calculateStats(data || [], refDate);
-            setStats(calculatedCurrentStats);
+
+            if (data && data.length > 0) {
+                setTransactions(data);
+                setIsDemoMode(false);
+                setStats(calculateStats(data, refDate));
+            } else {
+                setTransactions(SAMPLE_PUBLIC_TRANSACTIONS);
+                setIsDemoMode(true);
+                setStats(calculateStats(SAMPLE_PUBLIC_TRANSACTIONS, refDate));
+            }
             setLoading(false);
         };
 
@@ -330,9 +346,18 @@ const PublicDashboard = () => {
                             <h2 className="text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-6 leading-tight">
                                 {t('public.heroTitle')}
                             </h2>
-                            <p className="text-lg md:text-xl text-gray-600 mb-10 max-w-2xl mx-auto leading-relaxed">
+                            <p className="text-lg md:text-xl text-gray-600 mb-6 max-w-2xl mx-auto leading-relaxed">
                                 {t('public.heroSubtitle')}
                             </p>
+                            {isDemoMode && (
+                                <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+                                    <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                                    <span>Pratinjau Simulasi Transparansi.</span>
+                                    <Link to="/register" className="font-bold underline text-blue-800 hover:text-blue-900 ml-1">
+                                        Mulai Catat Keuangan Anda
+                                    </Link>
+                                </div>
+                            )}
                             <div className="flex justify-center gap-4">
                                 <motion.button
                                     whileHover={{ scale: 1.05 }}

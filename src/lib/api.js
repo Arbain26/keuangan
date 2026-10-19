@@ -46,6 +46,32 @@ export const createTransaction = async (transaction) => {
     }
 };
 
+export const createBulkTransactions = async (transactions) => {
+    try {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        
+        if (!userId) throw new Error("User not authenticated");
+        if (!Array.isArray(transactions) || transactions.length === 0) return [];
+
+        const transactionsWithUser = transactions.map(t => ({
+            ...t,
+            user_id: userId
+        }));
+
+        const { data, error } = await supabase
+            .from('transactions')
+            .insert(transactionsWithUser)
+            .select();
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error('Error creating bulk transactions:', error.message);
+        throw error;
+    }
+};
+
 export const deleteTransaction = async (id) => {
     try {
         const { error } = await supabase

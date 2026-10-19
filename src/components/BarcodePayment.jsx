@@ -39,12 +39,50 @@ const BarcodePayment = ({
         if (onMethodChange) onMethodChange(method);
     };
 
+    // Standard EMVCo CRC16-CCITT algorithm for QRIS
+    const computeCRC16 = (str) => {
+        let crc = 0xFFFF;
+        for (let i = 0; i < str.length; i++) {
+            crc ^= (str.charCodeAt(i) << 8);
+            for (let j = 0; j < 8; j++) {
+                if ((crc & 0x8000) !== 0) {
+                    crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+                } else {
+                    crc = (crc << 1) & 0xFFFF;
+                }
+            }
+        }
+        return crc.toString(16).toUpperCase().padStart(4, '0');
+    };
+
     // Generate Scannable Barcode / QRIS Data URL
     useEffect(() => {
         const generateQR = async () => {
             try {
-                // QRIS payload format representation with order and amount
-                const qrisPayload = `00020101021226670014ID.LINKAJA.WWW01189360091400202409260215${NMID}0303UME51440014ID.CO.QRIS.WWW0215${orderId || 'ORD-KEUANGAN'}52045499530336054${totalAmount ? String(totalAmount).length : 5}${totalAmount || 29000}5802ID5915${MERCHANT_NAME}6007JAKARTA6304ABCD`;
+                const cleanNmid = (NMID || 'ID1020240926881').trim();
+                const cleanName = (MERCHANT_NAME || 'MUHAMMAD ARBAIN').trim().slice(0, 25);
+                const cleanOrder = (orderId || 'ORD-KEUANGAN').trim().slice(0, 25);
+                const amtStr = String(Math.round(totalAmount || 29000));
+
+                // Tag 26: Merchant Account Information
+                const tag26Val = `0014ID.LINKAJA.WWW011893600914002024092602${String(cleanNmid.length).padStart(2, '0')}${cleanNmid}0303UME`;
+                const tag26 = `26${String(tag26Val.length).padStart(2, '0')}${tag26Val}`;
+
+                // Tag 51: National Payment Gateway (Order ID)
+                const tag51Val = `0014ID.CO.QRIS.WWW02${String(cleanOrder.length).padStart(2, '0')}${cleanOrder}`;
+                const tag51 = `51${String(tag51Val.length).padStart(2, '0')}${tag51Val}`;
+
+                const tag52 = '52045499';
+                const tag53 = '5303360';
+                const tag54 = `54${String(amtStr.length).padStart(2, '0')}${amtStr}`;
+                const tag58 = '5802ID';
+                const tag59 = `59${String(cleanName.length).padStart(2, '0')}${cleanName}`;
+                const tag60 = '6007JAKARTA';
+
+                // Base QRIS string before CRC checksum
+                const basePayload = `000201010212${tag26}${tag51}${tag52}${tag53}${tag54}${tag58}${tag59}${tag60}6304`;
+                const crc16 = computeCRC16(basePayload);
+                const qrisPayload = `${basePayload}${crc16}`;
                 
                 const url = await QRCode.toDataURL(qrisPayload, {
                     width: 400,
