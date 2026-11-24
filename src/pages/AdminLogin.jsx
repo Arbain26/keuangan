@@ -118,9 +118,13 @@ const AdminLogin = () => {
                                 {t('auth.registerNow')}
                             </Link>
                         </p>
-                        <div>
-                            <Link to="/" className="inline-flex items-center text-xs font-bold text-gray-600 hover:text-gray-900 transition">
-                                <LayoutDashboard className="w-3 h-3 mr-1.5" />
+                        <div className="flex items-center justify-center gap-3 text-xs">
+                            <Link to="/" className="text-gray-500 hover:text-gray-900 transition font-medium">
+                                ← Beranda
+                            </Link>
+                            <span className="text-gray-300">•</span>
+                            <Link to="/dashboard-publik" className="inline-flex items-center font-bold text-blue-600 hover:text-blue-700 transition">
+                                <LayoutDashboard className="w-3.5 h-3.5 mr-1" />
                                 {t('auth.backToPublic')}
                             </Link>
                         </div>

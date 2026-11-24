@@ -11,7 +11,7 @@ import {
 import { 
     Trash2, Upload, Award, Printer, Download, Target 
 } from 'lucide-react';
-import { formatCurrency, formatDate, normalizeCategory, formatNumberInput } from '../utils/format';
+import { formatDate, normalizeCategory, formatNumberInput } from '../utils/format';
 import { scanReceiptImage } from '../utils/receiptScanner';
 import { useLanguage } from '../hooks/useLanguage';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -120,9 +120,9 @@ const AdminDashboard = () => {
 
     // Auth & Subscription States
     const [user, setUser] = useState(null);
-    const [userSub, setUserSub] = useState(null);
-    const [usageLimits, setUsageLimits] = useState(DEFAULT_LIMITS);
-    const [plans, setPlans] = useState(DEFAULT_PLANS);
+    const [_userSub, setUserSub] = useState(null);
+    const [_usageLimits, setUsageLimits] = useState(DEFAULT_LIMITS);
+    const [_plans, setPlans] = useState(DEFAULT_PLANS);
     const [allSubscriptions, setAllSubscriptions] = useState([]);
     const [allOrders, setAllOrders] = useState([]);
     const [isConfirmingOrder, setIsConfirmingOrder] = useState(null);
@@ -254,6 +254,7 @@ const AdminDashboard = () => {
         loadInitialData();
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Transaction Form Handlers

@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
-import { fetchTransactions } from '../lib/api';
+import { fetchPublicTransactions } from '../lib/api';
 import { calculateStats, parseSafeDate } from '../utils/calculations';
 import { normalizeCategory } from '../utils/format';
 import { Link } from 'react-router-dom';
-import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle, Quote, PieChart, PiggyBank, Lightbulb, Sparkles } from 'lucide-react';
+import { LogIn, TrendingUp, ShieldCheck, BarChart3, ArrowDown, AlertTriangle, Quote, PieChart, PiggyBank, Lightbulb, Sparkles, Search, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../hooks/useLanguage';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -77,11 +77,15 @@ const PublicDashboard = () => {
     const [activePeriod, setActivePeriod] = useState('all'); // all | week | month | year
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [searchQuery, setSearchQuery] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all'); // all | pemasukan | pengeluaran
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     useEffect(() => {
         const loadData = async () => {
             setLoading(true);
-            const data = await fetchTransactions();
+            const data = await fetchPublicTransactions();
             const refDate = new Date(selectedYear, selectedMonth, 1);
 
             if (data && data.length > 0) {
@@ -189,20 +193,39 @@ const PublicDashboard = () => {
             const tYear = tDate.getFullYear();
             const now = new Date();
 
+            let matchesPeriod = true;
             if (activePeriod === 'week') {
                 const startOfWeek = new Date(now);
                 const day = now.getDay() || 7;
                 startOfWeek.setDate(now.getDate() - day + 1);
                 startOfWeek.setHours(0, 0, 0, 0);
-                return tDate >= startOfWeek;
+                matchesPeriod = tDate >= startOfWeek;
             } else if (activePeriod === 'month') {
-                return tMonth === selectedMonth && tYear === selectedYear;
+                matchesPeriod = tMonth === selectedMonth && tYear === selectedYear;
             } else if (activePeriod === 'year') {
-                return tYear === selectedYear;
+                matchesPeriod = tYear === selectedYear;
             }
+
+            if (!matchesPeriod) return false;
+            if (typeFilter !== 'all' && tItem.type !== typeFilter) return false;
+
+            if (searchQuery.trim()) {
+                const q = searchQuery.toLowerCase().trim();
+                const desc = (tItem.description || '').toLowerCase();
+                const cat = (tItem.category || '').toLowerCase();
+                if (!desc.includes(q) && !cat.includes(q)) return false;
+            }
+
             return true;
         });
-    }, [transactions, activePeriod, selectedMonth, selectedYear]);
+    }, [transactions, activePeriod, selectedMonth, selectedYear, typeFilter, searchQuery]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+    const safePage = currentPage > totalPages ? 1 : currentPage;
+    const paginatedTransactions = useMemo(() => {
+        const start = (safePage - 1) * itemsPerPage;
+        return filteredTransactions.slice(start, start + itemsPerPage);
+    }, [filteredTransactions, safePage, itemsPerPage]);
 
     const publicIncome = useMemo(() => transactions.filter(tItem => tItem.type === 'pemasukan').reduce((acc, tItem) => acc + Number(tItem.amount), 0), [transactions]);
     const publicExpense = useMemo(() => transactions.filter(tItem => tItem.type === 'pengeluaran').reduce((acc, tItem) => acc + Number(tItem.amount), 0), [transactions]);
@@ -309,20 +332,29 @@ const PublicDashboard = () => {
                                 {t('appName')}
                             </h1>
                         </Link>
-                        <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                            <Link to="/" className="text-gray-600 hover:text-blue-600 text-xs sm:text-sm font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition">
+                                Beranda
+                            </Link>
                             <button onClick={scrollToStats} className="hidden sm:inline-block text-gray-700 hover:text-blue-600 text-sm font-medium transition cursor-pointer">
                                 {t('public.title')}
                             </button>
-                            <Link to="/pricing" className="text-amber-600 hover:text-amber-700 text-sm font-bold transition flex items-center gap-1">
+                            <Link to="/pricing" className="text-amber-600 hover:text-amber-700 text-xs sm:text-sm font-bold transition flex items-center gap-1">
                                 <Sparkles className="w-4 h-4 text-amber-500" />
                                 <span className="hidden sm:inline">{t('nav.upgradePremium')}</span>
                             </Link>
                             <LanguageSwitcher variant="header" />
                             <Link
-                                to="/login"
-                                className="flex items-center gap-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 px-3.5 py-1.5 rounded-full transition shadow-lg shadow-gray-200"
+                                to="/register"
+                                className="hidden sm:inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-full border border-blue-200 hover:bg-blue-50 transition"
                             >
-                                <LogIn className="w-4 h-4" />
+                                {t('home.register')}
+                            </Link>
+                            <Link
+                                to="/login"
+                                className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-full transition shadow-xs shadow-blue-500/20"
+                            >
+                                <LogIn className="w-3.5 h-3.5" />
                                 <span>{t('public.loginAdmin')}</span>
                             </Link>
                         </div>
@@ -332,152 +364,52 @@ const PublicDashboard = () => {
 
             <main id="main-content">
                 {/* Hero Section */}
-                <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-blue-50/50 to-white">
-                    <div className="max-w-4xl mx-auto text-center">
+                <section className="pt-28 pb-8 px-4 bg-gradient-to-b from-blue-50/70 via-white to-gray-50 border-b border-gray-100">
+                    <div className="max-w-7xl mx-auto text-center">
                         <motion.div
                             initial="hidden"
                             whileInView="visible"
                             viewport={{ once: true }}
                             variants={fadeInUp}
                         >
-                            <span className="inline-block py-1 px-3 rounded-full bg-blue-100 text-blue-700 text-xs font-bold tracking-wide uppercase mb-6">
+                            <span className="inline-flex items-center gap-2 py-1 px-3.5 rounded-full bg-blue-100/80 text-blue-700 text-xs font-bold tracking-wide uppercase mb-3 shadow-2xs border border-blue-200">
+                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
                                 {t('home.badge')}
                             </span>
-                            <h2 className="text-3xl sm:text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mb-6 leading-tight">
+                            <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-3 leading-tight">
                                 {t('public.heroTitle')}
                             </h2>
-                            <p className="text-lg md:text-xl text-gray-600 mb-6 max-w-2xl mx-auto leading-relaxed">
+                            <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed">
                                 {t('public.heroSubtitle')}
                             </p>
-                            {isDemoMode && (
-                                <div className="mb-8 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
+
+                            {isDemoMode ? (
+                                <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-700 font-medium">
                                     <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
                                     <span>Pratinjau Simulasi Transparansi.</span>
                                     <Link to="/register" className="font-bold underline text-blue-800 hover:text-blue-900 ml-1">
                                         Mulai Catat Keuangan Anda
                                     </Link>
                                 </div>
+                            ) : (
+                                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs font-semibold text-gray-500">
+                                    <span className="bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-2xs">
+                                        Total: <strong className="text-gray-900">{transactions.length}</strong> transaksi publik
+                                    </span>
+                                    <span className="bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-2xs">
+                                        Status: <strong className="text-emerald-600 font-bold">● Terhubung Supabase</strong>
+                                    </span>
+                                    <span className="bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-2xs">
+                                        Akses: <strong className="text-blue-600">Publik (Tanpa Login)</strong>
+                                    </span>
+                                </div>
                             )}
-                            <div className="flex justify-center gap-4">
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={scrollToStats}
-                                    className="group bg-blue-600 text-white px-8 py-3.5 rounded-full font-semibold hover:bg-blue-700 transition flex items-center gap-2 shadow-xl shadow-blue-200"
-                                >
-                                    {t('public.scrollDown')}
-                                    <ArrowDown className="w-4 h-4 group-hover:translate-y-1 transition-transform" />
-                                </motion.button>
-                            </div>
                         </motion.div>
                     </div>
                 </section>
 
-                {/* Quote Section */}
-                <motion.section
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true }}
-                    variants={fadeInUp}
-                    className="bg-[#1e293b] text-white py-12 px-4 relative overflow-hidden"
-                >
-                    <div className="absolute top-0 left-0 w-32 h-32 bg-lime-400 rounded-full blur-[80px] opacity-20"></div>
-                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
-                    <div className="max-w-4xl mx-auto text-center relative z-10">
-                        <Quote className="w-12 h-12 text-lime-400 mx-auto mb-6 opacity-80" />
-                        <blockquote className="text-xl md:text-2xl font-serif italic leading-relaxed text-gray-200 mb-6">
-                            &ldquo;Jangan menabung apa yang tersisa setelah membelanjakan, tetapi belanjakan apa yang tersisa setelah menabung.&rdquo;
-                        </blockquote>
-                        <cite className="text-lime-400 font-bold tracking-wide uppercase text-sm">&mdash; Warren Buffett</cite>
-                    </div>
-                </motion.section>
-
-                {/* Features Section */}
-                <section className="py-20 px-4 border-t border-gray-100">
-                    <motion.div
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: "-100px" }}
-                        variants={staggerContainer}
-                        className="max-w-7xl mx-auto"
-                    >
-                        <div className="grid md:grid-cols-3 gap-12">
-                            <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
-                                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                    <ShieldCheck className="w-6 h-6" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-2">{t('home.feature3Title')}</h3>
-                                <p className="text-gray-500 leading-relaxed">{t('home.feature3Desc')}</p>
-                            </motion.div>
-                            <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
-                                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                    <BarChart3 className="w-6 h-6" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-2">{t('home.feature4Title')}</h3>
-                                <p className="text-gray-500 leading-relaxed">{t('home.feature4Desc')}</p>
-                            </motion.div>
-                            <motion.div variants={fadeInUp} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-xl transition duration-300">
-                                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                    <TrendingUp className="w-6 h-6" />
-                                </div>
-                                <h3 className="text-xl font-bold mb-2">{t('home.feature2Title')}</h3>
-                                <p className="text-gray-500 leading-relaxed">{t('home.feature2Desc')}</p>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                </section>
-
-                {/* Financial Education Section */}
-                <section className="py-20 px-4 bg-white border-t border-gray-100">
-                    <motion.div
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: "-100px" }}
-                        variants={staggerContainer}
-                        className="max-w-7xl mx-auto"
-                    >
-                        <div className="text-center mb-16">
-                            <motion.span variants={fadeInUp} className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">{t('public.insight')}</motion.span>
-                            <motion.h2 variants={fadeInUp} className="text-3xl font-bold text-gray-900 mt-3 mb-4">{t('public.financialTips')}</motion.h2>
-                            <motion.p variants={fadeInUp} className="text-gray-500 max-w-2xl mx-auto">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</motion.p>
-                        </div>
-
-                        <div className="grid md:grid-cols-3 gap-8">
-                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                    <PieChart className="w-7 h-7 text-indigo-600" />
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-3">Metode 50/30/20</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">
-                                    Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan, <span className="font-bold text-gray-700">30%</span> untuk Keinginan, dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
-                                </p>
-                            </motion.div>
-
-                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                    <PiggyBank className="w-7 h-7 text-emerald-600" />
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-3">Dana Darurat</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">
-                                    Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin sebagai jaring pengaman kondisi tak terduga.
-                                </p>
-                            </motion.div>
-
-                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
-                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
-                                    <Lightbulb className="w-7 h-7 text-amber-500" />
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-3">Investasi Leher ke Atas</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">
-                                    Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">keahlian & pengetahuan</span> untuk memperluas potensi pendapatan.
-                                </p>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                </section>
-
                 {/* Stats Section */}
-                <section id="stats-section" className="py-24 px-4 bg-gray-50">
+                <section id="stats-section" className="py-8 sm:py-12 px-4 bg-gray-50/70">
                     <motion.div
                         initial="hidden"
                         whileInView="visible"
@@ -711,10 +643,60 @@ const PublicDashboard = () => {
 
                         {/* Recent Transactions Section */}
                         <div className="mt-12 bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-                            <div className="p-8 border-b border-gray-100">
-                                <h3 className="text-xl font-bold text-gray-900">{t('public.recentTransactions')}</h3>
-                                <p className="text-gray-500 text-sm mt-1">{t('public.showingLatest')}</p>
+                            <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900">{t('public.recentTransactions')}</h3>
+                                    <p className="text-gray-500 text-sm mt-1">
+                                        {filteredTransactions.length} transaksi tercatat • Halaman {safePage} dari {totalPages}
+                                    </p>
+                                </div>
+
+                                {/* Search & Type Filter Controls */}
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                    {/* Search input */}
+                                    <div className="relative w-full sm:w-64">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Cari transaksi..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:border-blue-500 focus:bg-white outline-none transition"
+                                        />
+                                        {searchQuery && (
+                                            <button
+                                                onClick={() => setSearchQuery('')}
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded-full"
+                                                aria-label="Hapus pencarian"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Type filter pills */}
+                                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                                        {[
+                                            { id: 'all', label: 'Semua' },
+                                            { id: 'pemasukan', label: '+ Masuk' },
+                                            { id: 'pengeluaran', label: '- Keluar' }
+                                        ].map(item => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => setTypeFilter(item.id)}
+                                                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                                                    typeFilter === item.id
+                                                        ? 'bg-white text-blue-600 shadow-xs'
+                                                        : 'text-gray-600 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                {item.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
+
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50/50">
@@ -727,7 +709,7 @@ const PublicDashboard = () => {
                                     <tbody className="bg-white divide-y divide-gray-100">
                                         {loading ? (
                                             <tr><td colSpan="3" className="px-8 py-8 text-center text-gray-500">{t('public.loadingData')}</td></tr>
-                                        ) : filteredTransactions.slice(0, 10).map((tItem) => (
+                                        ) : paginatedTransactions.map((tItem) => (
                                             <tr key={tItem.id} className="hover:bg-gray-50/50 transition">
                                                 <td className="px-8 py-4 whitespace-nowrap text-sm text-gray-600">
                                                     {formatDate(tItem.date)}
@@ -749,11 +731,118 @@ const PublicDashboard = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            {!loading && filteredTransactions.length > 10 && (
-                                <div className="p-4 bg-gray-50 text-center text-xs text-gray-400">
-                                    {t('public.showingLatest')}
+
+                            {/* Pagination controls */}
+                            {!loading && totalPages > 1 && (
+                                <div className="p-4 bg-gray-50/75 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
+                                    <div>
+                                        Menampilkan <span className="font-bold text-gray-900">{(safePage - 1) * itemsPerPage + 1}</span> - <span className="font-bold text-gray-900">{Math.min(safePage * itemsPerPage, filteredTransactions.length)}</span> dari <span className="font-bold text-gray-900">{filteredTransactions.length}</span> transaksi
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
+                                            disabled={safePage === 1}
+                                            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                                            aria-label="Halaman Sebelumnya"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                            .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                                            .map((p, idx, arr) => (
+                                                <div key={p} className="flex items-center">
+                                                    {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-gray-400">...</span>}
+                                                    <button
+                                                        onClick={() => setCurrentPage(p)}
+                                                        className={`w-8 h-8 rounded-lg font-bold transition text-xs ${
+                                                            safePage === p
+                                                                ? 'bg-blue-600 text-white shadow-xs'
+                                                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                                                        }`}
+                                                    >
+                                                        {p}
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        <button
+                                            onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
+                                            disabled={safePage === totalPages}
+                                            className="p-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                                            aria-label="Halaman Berikutnya"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             )}
+                        </div>
+                    </motion.div>
+                </section>
+
+                {/* Quote Section */}
+                <motion.section
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true }}
+                    variants={fadeInUp}
+                    className="bg-[#1e293b] text-white py-12 px-4 relative overflow-hidden"
+                >
+                    <div className="absolute top-0 left-0 w-32 h-32 bg-lime-400 rounded-full blur-[80px] opacity-20"></div>
+                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-[80px] opacity-20"></div>
+                    <div className="max-w-4xl mx-auto text-center relative z-10">
+                        <Quote className="w-12 h-12 text-lime-400 mx-auto mb-6 opacity-80" />
+                        <blockquote className="text-xl md:text-2xl font-serif italic leading-relaxed text-gray-200 mb-6">
+                            &ldquo;Jangan menabung apa yang tersisa setelah membelanjakan, tetapi belanjakan apa yang tersisa setelah menabung.&rdquo;
+                        </blockquote>
+                        <cite className="text-lime-400 font-bold tracking-wide uppercase text-sm">&mdash; Warren Buffett</cite>
+                    </div>
+                </motion.section>
+
+                {/* Financial Education Section */}
+                <section className="py-16 px-4 bg-white border-t border-gray-100">
+                    <motion.div
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={staggerContainer}
+                        className="max-w-7xl mx-auto"
+                    >
+                        <div className="text-center mb-12">
+                            <motion.span variants={fadeInUp} className="text-blue-600 font-bold tracking-wider text-xs uppercase bg-blue-50 px-3 py-1 rounded-full">{t('public.insight')}</motion.span>
+                            <motion.h2 variants={fadeInUp} className="text-3xl font-bold text-gray-900 mt-3 mb-2">{t('public.financialTips')}</motion.h2>
+                            <motion.p variants={fadeInUp} className="text-gray-500 max-w-2xl mx-auto text-sm">Kelola uang Anda dengan bijak menggunakan prinsip-prinsip dasar keuangan yang telah terbukti ini.</motion.p>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-8">
+                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                    <PieChart className="w-7 h-7 text-indigo-600" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-3">Metode 50/30/20</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Alokasikan pendapatan Anda: <span className="font-bold text-gray-700">50%</span> untuk Kebutuhan, <span className="font-bold text-gray-700">30%</span> untuk Keinginan, dan <span className="font-bold text-gray-700">20%</span> untuk Tabungan & Investasi.
+                                </p>
+                            </motion.div>
+
+                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                    <PiggyBank className="w-7 h-7 text-emerald-600" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-3">Dana Darurat</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Siapkan dana cair setara <span className="font-bold text-gray-700">3-6 bulan</span> pengeluaran rutin sebagai jaring pengaman kondisi tak terduga.
+                                </p>
+                            </motion.div>
+
+                            <motion.div variants={fadeInUp} className="bg-gray-50 rounded-2xl p-8 border border-gray-100 hover:border-blue-100 hover:shadow-lg transition group">
+                                <div className="w-14 h-14 bg-white rounded-xl shadow-sm flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                                    <Lightbulb className="w-7 h-7 text-amber-500" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-3">Investasi Leher ke Atas</h3>
+                                <p className="text-gray-500 text-sm leading-relaxed">
+                                    Investasi terbaik adalah pada diri sendiri. Tingkatkan <span className="font-bold text-gray-700">keahlian & pengetahuan</span> untuk memperluas potensi pendapatan.
+                                </p>
+                            </motion.div>
                         </div>
                     </motion.div>
                 </section>

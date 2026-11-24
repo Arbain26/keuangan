@@ -1,5 +1,6 @@
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { translations } from '../i18n/translations';
+import { LanguageContext } from './languageContextInstance';
 
 const STORAGE_KEY = 'keuangan_lang';
 const VALID_LANGS = ['id', 'en'];
@@ -18,8 +19,6 @@ const getInitialLang = () => {
   }
   return DEFAULT_LANG;
 };
-
-export const LanguageContext = createContext(null);
 
 export const LanguageProvider = ({ children }) => {
   const [lang, setLangState] = useState(getInitialLang);

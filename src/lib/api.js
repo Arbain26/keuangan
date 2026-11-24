@@ -1,11 +1,33 @@
 import { supabase } from './supabaseClient';
 
-export const fetchTransactions = async () => {
+export const fetchPublicTransactions = async () => {
     try {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching public transactions:', error.message);
+        return [];
+    }
+};
+
+export const fetchTransactions = async (options = {}) => {
+    try {
+        if (options?.isPublic) {
+            return await fetchPublicTransactions();
+        }
+
         const { data: userData } = await supabase.auth.getUser();
         const userId = userData?.user?.id;
         
-        if (!userId) return []; // Jangan fetch jika belum login
+        // Jika belum login, fallback ambil transaksi publik agar tampilan publik tidak kosong
+        if (!userId) {
+            return await fetchPublicTransactions();
+        }
 
         const { data, error } = await supabase
             .from('transactions')
@@ -14,7 +36,7 @@ export const fetchTransactions = async () => {
             .order('date', { ascending: false });
 
         if (error) throw error;
-        return data;
+        return data || [];
     } catch (error) {
         console.error('Error fetching transactions:', error.message);
         return [];

@@ -197,10 +197,12 @@ const id = {
     scrollDown: 'Lihat Ringkasan',
     insight: 'Insight',
     allTime: 'Sepanjang Waktu',
+    netCashflow: 'Arus Kas Bersih',
   },
 
   // ── Dashboard Admin ──
   admin: {
+    loading: 'Memuat data...',
     loadingDashboard: 'Menyiapkan dashboard Keuangan...',
     workspace: 'KEUANGAN WORKSPACE',
     dashboardTitle: 'Ikhtisar Dashboard & Analitik',
@@ -249,6 +251,7 @@ const id = {
     finalBalance: 'Saldo Akhir',
     income: 'Pemasukan',
     expense: 'Pengeluaran',
+    action: 'Aksi',
   },
 
   // ── Periode ──
@@ -491,6 +494,19 @@ const id = {
     feat5Desc: 'Akses dari mana saja, kapan saja. Install langsung di layar utama smartphone Anda.',
     feat6Title: 'Laporan & Export',
     feat6Desc: 'Export laporan keuangan ke Excel dengan format rapi dan siap cetak.',
+    feature1Title: 'Dashboard Real-time',
+    feature1Desc: 'Pantau arus kas dengan grafik interaktif yang terupdate secara real-time.',
+    feature2Title: 'OCR Struk Otomatis',
+    feature2Desc: 'Foto struk belanja, AI kami akan mengekstrak data transaksi secara otomatis.',
+    feature3Title: 'Analisis Kategori',
+    feature3Desc: 'Lihat distribusi pengeluaran per kategori dengan visualisasi yang informatif.',
+    feature4Title: 'Keamanan Terjamin',
+    feature4Desc: 'Enkripsi data & Row Level Security memastikan privasi keuangan Anda aman.',
+    feature5Title: 'PWA Mobile-Ready',
+    feature5Desc: 'Akses dari mana saja, kapan saja. Install langsung di layar utama smartphone Anda.',
+    feature6Title: 'Laporan & Export',
+    feature6Desc: 'Export laporan keuangan ke Excel dengan format rapi dan siap cetak.',
+    navPublicDashboard: 'Dashboard Publik',
     // How it works
     howBadge: 'Mudah & Cepat',
     howTitle: 'Mulai dalam 3 Langkah Sederhana',
@@ -584,6 +600,26 @@ const id = {
     alertBannerTitle: 'Peringatan Anggaran Terlampaui',
     alertBannerDesc: 'Ada {count} kategori pengeluaran yang telah mendekati atau melebihi batas anggaran bulan ini.',
     quickPreset: 'Pilihan Cepat',
+  },
+
+  // ── Pricing Preview ──
+  pricing: {
+    freeSubtitle: 'Pencatatan keuangan dasar tanpa biaya',
+    featIncomeExpense: 'Catat pemasukan & pengeluaran harian',
+    featRealtimeDash: 'Dashboard statistik & grafik real-time',
+    featMonthlyChart: 'Visualisasi tren arus kas bulanan',
+    featExcelExport: 'Ekspor laporan transaksi ke Excel (.xlsx)',
+    featCustomCategory: 'Kategori kustom fleksibel',
+    mostPopular: 'Paling Populer',
+    completeFeatures: 'Fitur lengkap untuk produktivitas maksimal',
+    perMonth: 'bulan',
+    allFreeFeatures: 'Semua fitur paket Free',
+    ocrAutoScan: 'OCR scan nota belanja otomatis berbasis AI',
+    deepAnalysisReport: 'Laporan analisis keuangan mendalam',
+    multiCurrencyForeign: 'Multi-currency (IDR & USD) + konversi instan',
+    businessReadyTemplates: 'Template laporan Excel akuntansi siap pakai',
+    prioritySupport: 'Dukungan prioritas & pembaruan berkala',
+    viewDetailPlans: 'Lihat Detail Paket & Berlangganan',
   },
 
   // ── Bahasa ──
@@ -743,10 +779,12 @@ const en = {
     scrollDown: 'View Summary',
     insight: 'Insight',
     allTime: 'All Time',
+    netCashflow: 'Net Cash Flow',
   },
 
   // ── Admin Dashboard ──
   admin: {
+    loading: 'Loading data...',
     loadingDashboard: 'Preparing Keuangan dashboard...',
     workspace: 'KEUANGAN WORKSPACE',
     dashboardTitle: 'Dashboard Overview & Analytics',
@@ -795,6 +833,7 @@ const en = {
     finalBalance: 'Final Balance',
     income: 'Income',
     expense: 'Expense',
+    action: 'Action',
   },
 
   // ── Period ──
@@ -1032,6 +1071,19 @@ const en = {
     feat5Desc: 'Access from anywhere, anytime. Install directly on your smartphone home screen.',
     feat6Title: 'Reports & Export',
     feat6Desc: 'Export financial reports to Excel with neat and print-ready formats.',
+    feature1Title: 'Real-time Dashboard',
+    feature1Desc: 'Monitor cash flow with interactive charts that update in real-time.',
+    feature2Title: 'Auto Receipt OCR',
+    feature2Desc: 'Take a photo of your receipt, our AI will extract transaction data automatically.',
+    feature3Title: 'Category Analysis',
+    feature3Desc: 'View expense distribution by category with informative visualizations.',
+    feature4Title: 'Guaranteed Security',
+    feature4Desc: 'Data encryption & Row Level Security ensures your financial privacy is safe.',
+    feature5Title: 'PWA Mobile-Ready',
+    feature5Desc: 'Access from anywhere, anytime. Install directly on your smartphone home screen.',
+    feature6Title: 'Reports & Export',
+    feature6Desc: 'Export financial reports to Excel with neat and print-ready formats.',
+    navPublicDashboard: 'Public Dashboard',
     howBadge: 'Easy & Fast',
     howTitle: 'Start in 3 Simple Steps',
     howSubtitle: 'It only takes 1 minute to sign up and start managing your finances.',
@@ -1118,6 +1170,26 @@ const en = {
     alertBannerTitle: 'Budget Limit Alerts',
     alertBannerDesc: '{count} categories have reached 80% or exceeded their monthly budget limit.',
     quickPreset: 'Quick Presets',
+  },
+
+  // ── Pricing Preview ──
+  pricing: {
+    freeSubtitle: 'Basic financial tracking with zero cost',
+    featIncomeExpense: 'Record daily income & expenses',
+    featRealtimeDash: 'Real-time dashboard stats & interactive charts',
+    featMonthlyChart: 'Monthly cash flow trend visualization',
+    featExcelExport: 'Export transaction reports to Excel (.xlsx)',
+    featCustomCategory: 'Flexible custom categories',
+    mostPopular: 'Most Popular',
+    completeFeatures: 'Full feature set for maximum productivity',
+    perMonth: 'month',
+    allFreeFeatures: 'All Free plan features',
+    ocrAutoScan: 'AI-powered auto OCR receipt scanner',
+    deepAnalysisReport: 'In-depth financial intelligence reports',
+    multiCurrencyForeign: 'Multi-currency (IDR & USD) with instant conversion',
+    businessReadyTemplates: 'Executive accounting Excel templates',
+    prioritySupport: 'Priority support & continuous updates',
+    viewDetailPlans: 'View Plan Details & Subscribe',
   },
 
   // ── Language ──

@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const BudgetManager = ({
     budgets = {},
     transactions = [],
-    userId = null,
+    _userId = null,
     onSaveBudget,
     onDeleteBudget,
     displayCurrency,

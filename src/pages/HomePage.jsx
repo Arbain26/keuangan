@@ -7,6 +7,7 @@ import {
   Sparkles, Receipt, Users, Globe, Lock, Smartphone,
   Menu, X
 } from 'lucide-react';
+import { fetchPublicTransactions } from '../lib/api';
 import { useLanguage } from '../hooks/useLanguage';
 import { usePageTitle } from '../hooks/usePageTitle';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -87,12 +88,61 @@ const FAQItem = ({ q, a, isOpen, onClick }) => (
 // ███  HOMEPAGE COMPONENT
 // ═══════════════════════════════════════════════════════════
 const HomePage = () => {
-  const { t, lang } = useLanguage();
+  const { t, lang, formatCurrency } = useLanguage();
   usePageTitle('appName');
 
   const [openFAQ, setOpenFAQ] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [liveData, setLiveData] = useState({
+    balance: 0,
+    income: 0,
+    expense: 0,
+    count: 0,
+    recent: [],
+    monthlyHeights: [35, 55, 40, 70, 50, 80, 65, 90, 75, 60, 85, 95],
+    loading: true
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLive = async () => {
+      try {
+        const trans = await fetchPublicTransactions();
+        if (!isMounted) return;
+        if (trans && trans.length > 0) {
+          const inc = trans.filter(item => item.type === 'pemasukan').reduce((a, b) => a + Number(b.amount || 0), 0);
+          const exp = trans.filter(item => item.type === 'pengeluaran').reduce((a, b) => a + Number(b.amount || 0), 0);
+          const curYear = new Date().getFullYear();
+          const monthlyTotals = Array(12).fill(0);
+          trans.forEach(item => {
+            const d = new Date(item.date);
+            if (!isNaN(d.getTime()) && d.getFullYear() === curYear) {
+              monthlyTotals[d.getMonth()] += Number(item.amount || 0);
+            }
+          });
+          const maxVal = Math.max(1, ...monthlyTotals);
+          const monthlyHeights = monthlyTotals.map(v => Math.max(20, Math.round((v / maxVal) * 95)));
+
+          setLiveData({
+            balance: inc - exp,
+            income: inc,
+            expense: exp,
+            count: trans.length,
+            recent: trans.slice(0, 4),
+            monthlyHeights,
+            loading: false
+          });
+        } else {
+          setLiveData(prev => ({ ...prev, loading: false }));
+        }
+      } catch {
+        if (isMounted) setLiveData(prev => ({ ...prev, loading: false }));
+      }
+    };
+    fetchLive();
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -149,12 +199,16 @@ const HomePage = () => {
             </Link>
 
             {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden md:flex items-center gap-6">
               <button onClick={() => scrollTo('features')} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors cursor-pointer">{t('home.navFeatures')}</button>
               <button onClick={() => scrollTo('how-it-works')} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors cursor-pointer">{t('home.navHowItWorks')}</button>
               <button onClick={() => scrollTo('pricing')} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors cursor-pointer">{t('home.navPricing')}</button>
               <button onClick={() => scrollTo('testimonials')} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors cursor-pointer">{t('home.navTestimonials')}</button>
               <button onClick={() => scrollTo('faq')} className="text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors cursor-pointer">{t('home.navFaq')}</button>
+              <Link to="/dashboard-publik" className="text-blue-600 hover:text-blue-700 text-sm font-semibold transition-colors flex items-center gap-1.5 bg-blue-50/80 hover:bg-blue-100/80 px-3 py-1.5 rounded-xl border border-blue-200/80 shadow-2xs">
+                <BarChart3 className="w-4 h-4 text-blue-600" />
+                <span>{t('home.navPublicDashboard')}</span>
+              </Link>
             </div>
 
             {/* Desktop CTA */}
@@ -204,6 +258,10 @@ const HomePage = () => {
                 <button onClick={() => scrollTo('pricing')} className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">{t('home.navPricing')}</button>
                 <button onClick={() => scrollTo('testimonials')} className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">{t('home.navTestimonials')}</button>
                 <button onClick={() => scrollTo('faq')} className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">{t('home.navFaq')}</button>
+                <Link to="/dashboard-publik" className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-blue-600 bg-blue-50 rounded-lg font-semibold transition">
+                  <BarChart3 className="w-4 h-4 text-blue-600" />
+                  <span>{t('home.navPublicDashboard')}</span>
+                </Link>
                 <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
                   <div className="py-2 flex justify-center">
                     <LanguageSwitcher variant="pill" />
@@ -276,8 +334,16 @@ const HomePage = () => {
               </Link>
 
               <Link
+                to="/dashboard-publik"
+                className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-base font-semibold bg-white border border-blue-200 text-blue-700 hover:bg-blue-50/70 transition-all active:scale-98 shadow-xs"
+              >
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <span>{t('home.navPublicDashboard')}</span>
+              </Link>
+
+              <Link
                 to="/login"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-xl text-base font-semibold border border-gray-300 text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-all active:scale-98"
+                className="inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-base font-semibold border border-gray-300 text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-all active:scale-98"
               >
                 {t('home.ctaLogin')}
                 <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -324,9 +390,10 @@ const HomePage = () => {
                   <div className="w-3 h-3 rounded-full bg-emerald-400" />
                 </div>
                 <div className="flex-1 ml-4">
-                  <div className="max-w-xs mx-auto bg-white border border-gray-200 rounded-md px-4 py-1 text-xs text-gray-500 text-center font-mono">
-                    {t('home.mockUrl')}
-                  </div>
+                  <Link to="/dashboard-publik" className="max-w-xs mx-auto bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-md px-4 py-1 text-xs text-gray-600 hover:text-blue-600 text-center font-mono flex items-center justify-center gap-1.5 transition">
+                    <span>{t('home.mockUrl')}</span>
+                    <ArrowRight className="w-3 h-3 text-blue-500" />
+                  </Link>
                 </div>
               </div>
 
@@ -334,13 +401,41 @@ const HomePage = () => {
               <div className="p-6 md:p-8 bg-white">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   {[
-                    { label: t('home.mockBalance'), value: 'Rp 14.250.000', color: 'text-blue-700', bg: 'bg-blue-50/60 border-blue-100' },
-                    { label: t('home.mockIncome'), value: 'Rp 9.500.000', color: 'text-emerald-700', bg: 'bg-emerald-50/60 border-emerald-100' },
-                    { label: t('home.mockExpense'), value: 'Rp 4.120.000', color: 'text-rose-700', bg: 'bg-rose-50/60 border-rose-100' },
-                    { label: t('home.mockSavings'), value: 'Rp 5.380.000', color: 'text-amber-700', bg: 'bg-amber-50/60 border-amber-100' },
+                    {
+                      label: t('home.mockBalance'),
+                      value: liveData.loading ? 'Memuat...' : formatCurrency(liveData.balance),
+                      color: 'text-blue-700',
+                      bg: 'bg-blue-50/60 border-blue-100',
+                      badge: 'Live'
+                    },
+                    {
+                      label: t('home.mockIncome'),
+                      value: liveData.loading ? 'Memuat...' : formatCurrency(liveData.income),
+                      color: 'text-emerald-700',
+                      bg: 'bg-emerald-50/60 border-emerald-100'
+                    },
+                    {
+                      label: t('home.mockExpense'),
+                      value: liveData.loading ? 'Memuat...' : formatCurrency(liveData.expense),
+                      color: 'text-rose-700',
+                      bg: 'bg-rose-50/60 border-rose-100'
+                    },
+                    {
+                      label: 'Total Transaksi',
+                      value: liveData.loading ? 'Memuat...' : `${liveData.count} Catatan`,
+                      color: 'text-amber-700',
+                      bg: 'bg-amber-50/60 border-amber-100'
+                    },
                   ].map((card, i) => (
                     <div key={i} className={`${card.bg} border rounded-xl p-4 transition-all hover:shadow-xs`}>
-                      <p className="text-xs text-gray-600 font-medium mb-1">{card.label}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-gray-600 font-medium">{card.label}</p>
+                        {card.badge && (
+                          <span className="text-[10px] font-bold text-blue-600 bg-blue-100/70 px-1.5 py-0.2 rounded-full">
+                            {card.badge}
+                          </span>
+                        )}
+                      </div>
                       <p className={`text-base md:text-lg font-bold ${card.color} truncate`}>{card.value}</p>
                     </div>
                   ))}
@@ -357,7 +452,7 @@ const HomePage = () => {
                     </span>
                   </div>
                   <div className="h-44 md:h-52 flex items-end gap-2 pt-2">
-                    {[35, 55, 40, 70, 50, 80, 65, 90, 75, 60, 85, 95].map((h, i) => (
+                    {liveData.monthlyHeights.map((h, i) => (
                       <motion.div
                         key={i}
                         initial={{ height: 0 }}
@@ -372,6 +467,39 @@ const HomePage = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Live Recent Transactions in Mockup */}
+                {liveData.recent.length > 0 && (
+                  <div className="mt-6 border-t border-gray-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <Receipt className="w-3.5 h-3.5 text-blue-600" />
+                        <span>{t('public.recentTransactions')} (Live)</span>
+                      </span>
+                      <Link to="/dashboard-publik" className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 transition">
+                        <span>Buka Dashboard Publik Lengkap ({liveData.count} transaksi)</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                    <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 overflow-hidden text-xs bg-white">
+                      {liveData.recent.map(item => (
+                        <div key={item.id} className="flex items-center justify-between px-3.5 py-2.5 hover:bg-gray-50/80 transition">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${item.type === 'pemasukan' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            <span className="font-medium text-gray-900 truncate capitalize">{item.category}</span>
+                            {item.description && <span className="text-gray-400 truncate hidden sm:inline">• {item.description}</span>}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 ml-2">
+                            <span className="text-gray-400 text-[11px]">{item.date}</span>
+                            <span className={`font-bold ${item.type === 'pemasukan' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {item.type === 'pemasukan' ? '+' : '-'} {formatCurrency(item.amount)}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
@@ -730,6 +858,7 @@ const HomePage = () => {
                 <li><button onClick={() => scrollTo('features')} className="text-gray-600 hover:text-blue-600 text-sm transition cursor-pointer">{t('home.navFeatures')}</button></li>
                 <li><button onClick={() => scrollTo('how-it-works')} className="text-gray-600 hover:text-blue-600 text-sm transition cursor-pointer">{t('home.navHowItWorks')}</button></li>
                 <li><Link to="/pricing" className="text-gray-600 hover:text-blue-600 text-sm transition">{t('home.navPricing')}</Link></li>
+                <li><Link to="/dashboard-publik" className="text-blue-600 hover:text-blue-700 font-medium text-sm transition">{t('home.navPublicDashboard')}</Link></li>
                 <li><button onClick={() => scrollTo('faq')} className="text-gray-600 hover:text-blue-600 text-sm transition cursor-pointer">{t('home.navFaq')}</button></li>
               </ul>
             </div>

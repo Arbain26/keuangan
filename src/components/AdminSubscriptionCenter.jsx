@@ -36,7 +36,7 @@ export const AdminSubscriptionCenter = ({
     onDeleteUser,
     isConfirmingOrder
 }) => {
-    const { t, formatCurrency: fmtCurr, formatDate: fmtDate } = useLanguage();
+    const { t } = useLanguage();
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [userStatusFilter, setUserStatusFilter] = useState('ALL'); // ALL | ACTIVE | FREE | EXPIRED
     const [orderFilter, setOrderFilter] = useState('ALL'); // ALL | PENDING | PAID | CANCELLED | EXPIRED
